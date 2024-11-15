@@ -121,3 +121,8 @@ The **Settings** tab in Blender Manager is designed to give users full control o
 Your Blender Manager is now installed and ready to use. Enjoy enhanced management of your Blender projects!
 
 If you have any issues or questions, please refer to the troubleshooting section or contact support for further assistance.
+
+Donate links:
+https://verlorengest.gumroad.com/l/blendermanager
+https://buymeacoffee.com/verlorengest
+
