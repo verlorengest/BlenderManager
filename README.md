@@ -1,3 +1,5 @@
+![manager](https://github.com/user-attachments/assets/7f1728df-498a-4c75-b81f-96ba8ba268e2)
+
 Blender Manager includes several powerful features designed to streamline project setup and tracking, all without the need to open Blender initially. Here’s a closer look at some of its standout functionalities:
 
 ### 1. **Project Time Tracking**
