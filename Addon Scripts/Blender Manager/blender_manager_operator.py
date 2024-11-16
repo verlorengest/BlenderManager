@@ -7,6 +7,14 @@ import uuid
 
 COMM_DIR = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'mngaddon')
 SETTINGS_FILE = os.path.join(COMM_DIR, 'settings.json')
+AUTOSAVED_PROJECTS_FILE = os.path.join(COMM_DIR, 'autosaved_projects.json')
+
+
+
+
+
+
+
 
 def check_for_settings_file():
     """Checks for settings.json and processes it if found"""
@@ -18,12 +26,13 @@ def check_for_settings_file():
             print("[Blender Manager] Settings loaded:", data)
             apply_settings(data)
             print("[Blender Manager] settings.json processed.")
+            os.remove(SETTINGS_FILE)  # Delete settings.json after processing
         except Exception as e:
             print(f"[Blender Manager] Error reading settings.json: {e}")
         return None
     else:
-        
         return 1.0  
+
 
 def apply_settings(data):
     """Applies the settings in Blender"""
@@ -63,9 +72,39 @@ def apply_settings(data):
     if data.get('activate_autosave', False):
         activate_autosave(data)
 
+
+
+@bpy.app.handlers.persistent
+def on_save_post_handler(dummy):
+    print("[Blender Manager] Save event detected.")
+    try:
+        project_path = bpy.data.filepath
+        if project_path:
+            project_path = os.path.abspath(os.path.normpath(project_path))
+            autosaved_projects = load_autosaved_projects()
+            if project_path not in autosaved_projects:
+                interval = bpy.context.scene.auto_saver_interval
+                directory = bpy.context.scene.auto_saver_directory
+                unique_names = bpy.context.scene.auto_saver_unique_names
+
+                autosaved_projects[project_path] = {
+                    'autosave_interval': interval,
+                    'autosave_directory': directory,
+                    'autosave_unique_names': unique_names
+                }
+                save_autosaved_projects(autosaved_projects)
+                print(f"[Blender Manager] Autosave settings saved for project: {project_path}")
+        else:
+            print("[Blender Manager] Project not saved yet.")
+    except Exception as e:
+        print(f"[Blender Manager] Error in on_save_post_handler: {e}")
+
+
+
+
+
 def activate_autosave(data):
-    """Activates the AutoSaver feature based on JSON settings."""
-    print("[Blender Manager] Activating AutoSaver...")
+    print(f"[Blender Manager] Activating AutoSaver with data: {data}")
 
     interval = data.get('autosave_interval', 300)
     bpy.context.scene.auto_saver_interval = interval
@@ -79,11 +118,31 @@ def activate_autosave(data):
 
     if not bpy.context.scene.auto_saver_running:
         try:
-            bpy.ops.wm.auto_saver_operator()
-            print(f"[Blender Manager] AutoSaver started with interval: {interval} seconds, "
-                  f"directory: {directory}, unique names: {unique_names}")
+            operator = AutoSaverOperator()
+            operator.execute(bpy.context)
+            result = bpy.ops.wm.auto_saver_operator()
+            bpy.context.scene.auto_saver_running = True
+            print(f"[Blender Manager] AutoSaver operator started: {result}")
+
+            project_path = bpy.data.filepath
+            if project_path:
+                project_path = os.path.abspath(os.path.normpath(project_path))
+                autosaved_projects = load_autosaved_projects()
+                autosaved_projects[project_path] = {
+                    'autosave_interval': interval,
+                    'autosave_directory': directory,
+                    'autosave_unique_names': unique_names
+                }
+                save_autosaved_projects(autosaved_projects)
+                print(f"[Blender Manager] Autosave settings saved for project: {project_path}")
+            else:
+                print("[Blender Manager] Project not saved yet. Settings will be saved upon first save.")
         except Exception as e:
             print(f"[Blender Manager] Failed to start AutoSaver: {e}")
+
+
+
+
 
 
 
@@ -101,6 +160,9 @@ def import_mesh(mesh_path):
     else:
         print(f"[Blender Manager] Unsupported mesh format: {ext}")
 
+
+
+
 def add_reference_images(images):
     """Adds reference images to the scene"""
     for position, image_path in images.items():
@@ -109,6 +171,10 @@ def add_reference_images(images):
             create_background_image(image_path, position)
         else:
             print(f"[Blender Manager] Image not found: {image_path}")
+
+
+
+
 
 def create_background_image(image_path, position):
     """Creates a background image aligned to the specified view."""
@@ -149,6 +215,11 @@ def create_background_image(image_path, position):
             obj.empty_image_side = 'FRONT'  
             print(f"Side settings changed to Front for {obj.name}.")
 
+
+
+
+
+
 def add_light():
     """Adds a light to the scene"""
     bpy.ops.object.light_add(type='POINT', align='WORLD', location=(5, 5, 5))
@@ -156,12 +227,20 @@ def add_light():
     light.data.energy = 1000
     print("[Blender Manager] Added light to the scene.")
 
+
+
+
+
 def add_camera():
     """Adds a camera to the scene"""
     bpy.ops.object.camera_add(align='VIEW', location=(0, -10, 0), rotation=(1.5708, 0, 0))
     camera = bpy.context.active_object
     bpy.context.scene.camera = camera
     print("[Blender Manager] Added camera to the scene.")
+
+
+
+
 
 def register():
     bpy.utils.register_class(AutoSaverOperator)
@@ -188,6 +267,11 @@ def register():
         default=False
     )
     bpy.app.timers.register(check_for_settings_file)
+    bpy.app.handlers.save_post.append(on_save_post_handler)
+
+
+
+
 
 
 def unregister():
@@ -197,10 +281,35 @@ def unregister():
     del bpy.types.Scene.auto_saver_directory
     del bpy.types.Scene.auto_saver_unique_names
 
+    if on_save_post_handler in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.remove(on_save_post_handler)
 
 
 
 
+
+def load_autosaved_projects():
+    if os.path.exists(AUTOSAVED_PROJECTS_FILE):
+        try:
+            with open(AUTOSAVED_PROJECTS_FILE, 'r') as file:
+                data = json.load(file)
+                print("[Blender Manager] Loaded autosaved projects data.")
+                return data
+        except json.JSONDecodeError:
+            print("[Blender Manager] Invalid JSON format in autosaved_projects.json.")
+    return {}
+
+def save_autosaved_projects(data):
+    os.makedirs(COMM_DIR, exist_ok=True)
+    try:
+        with open(AUTOSAVED_PROJECTS_FILE, 'w') as file:
+            json.dump(data, file, indent=4)
+            print("[Blender Manager] Autosaved projects data saved.")
+    except Exception as e:
+        print(f"[Blender Manager] Error saving autosaved projects data: {e}")
+
+    # Autosave durumunu da kaydedin
+    bpy.context.scene.auto_saver_running = True
 
 
 
@@ -254,11 +363,16 @@ class AutoSaverOperator(bpy.types.Operator):
         return {'PASS_THROUGH'}
 
     def execute(self, context):
+        if context.scene.auto_saver_running:
+            print("[Blender Manager] AutoSaver is already running. No need to start again.")
+            return {'CANCELLED'}
+
         context.scene.auto_saver_running = True
         wm = context.window_manager
         self._timer = wm.event_timer_add(1.0, window=context.window)
         self._last_save_time = time.time()
         wm.modal_handler_add(self)
+        print("[Blender Manager] AutoSaver started successfully.")
         return {'RUNNING_MODAL'}
 
     def cancel(self, context):
@@ -269,6 +383,17 @@ class AutoSaverOperator(bpy.types.Operator):
 
 
 
+def restart_autosave():
+    """Manually restart the AutoSaver modal if it is not running."""
+    print("[Blender Manager] Restarting AutoSaver manually.")
+    if bpy.context.scene.auto_saver_running:
+        bpy.context.scene.auto_saver_running = False
+        bpy.ops.wm.auto_saver_operator('INVOKE_DEFAULT')
+        print("[Blender Manager] AutoSaver operator restarted.")
+    else:
+        print("[Blender Manager] AutoSaver was not running; starting now.")
+        bpy.context.scene.auto_saver_running = True
+        bpy.ops.wm.auto_saver_operator('INVOKE_DEFAULT')
 
 
 

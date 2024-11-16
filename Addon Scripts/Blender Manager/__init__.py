@@ -2,8 +2,8 @@ bl_info = {
     "name": "Blender Manager",
     "description": "Essential Blender addon for Blender Manager.",
     "author": "verlorengest",
-    "version": (1, 0, 10),
-    "blender": (4, 2, 0),  # Minimum Blender version required
+    "version": (1, 0, 2),
+    "blender": (4, 2, 0),  #  4.0.0 + 
     "location": "File > External Tools > Blender Manager",
     "category": "System",
 }
@@ -14,6 +14,10 @@ import os
 import time
 from bpy.app.handlers import persistent
 from . import blender_manager_operator
+from .blender_manager_operator import load_autosaved_projects, activate_autosave, restart_autosave
+
+
+
 
 COMM_DIR = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'mngaddon')
 PROJECT_TIME_FILE = os.path.join(COMM_DIR, 'project_time.json')
@@ -113,6 +117,10 @@ def on_load_post_handler(dummy):
         current_time = time.time()
         
         if filepath:
+            
+            filepath = os.path.abspath(os.path.normpath(filepath))
+            print(f"[Blender Manager] Normalized filepath: {filepath}")
+            # Existing project loaded
             if project_path and project_open_time is not None:
                 elapsed_time = current_time - project_open_time
                 print(f"[Blender Manager] Elapsed time for {project_path}: {elapsed_time:.2f} seconds.")
@@ -129,25 +137,30 @@ def on_load_post_handler(dummy):
             project_path = filepath
             project_open_time = current_time
             print(f"[Blender Manager] Project loaded: {project_path} at {time.ctime(project_open_time)}")
-        else:
-            if project_path and project_open_time is not None:
-                elapsed_time = current_time - project_open_time
-                print(f"[Blender Manager] Elapsed time for {project_path}: {elapsed_time:.2f} seconds.")
-                
-                project_time_data = load_project_time_data()
-                
-                if project_path in project_time_data:
-                    project_time_data[project_path] += elapsed_time
-                else:
-                    project_time_data[project_path] = elapsed_time
 
-                save_project_time_data(project_time_data)
-            
-            project_path = None
+            autosaved_projects = load_autosaved_projects()
+            if filepath in autosaved_projects:
+                autosave_data = autosaved_projects[filepath]
+                bpy.context.scene.auto_saver_interval = autosave_data['autosave_interval']
+                bpy.context.scene.auto_saver_directory = autosave_data['autosave_directory']
+                bpy.context.scene.auto_saver_unique_names = autosave_data['autosave_unique_names']
+                restart_autosave()
+                print(f"[Blender Manager] Autosave settings applied for project: {filepath}")
+
+                if not bpy.context.scene.auto_saver_running:
+                    bpy.context.scene.auto_saver_running = True
+                    result = bpy.ops.wm.auto_saver_operator('INVOKE_DEFAULT')
+                    print(f"[Blender Manager] AutoSaver operator started: {result}")
+                else:
+                    print("[Blender Manager] AutoSaver is already running.")
+            else:
+                print("[Blender Manager] No autosave settings found for this project.")
+
+            project_path = filepath
             project_open_time = current_time
-            print(f"[Blender Manager] New project created at {time.ctime(project_open_time)}. Timer reset.")
-    except AttributeError:
-        print("[Blender Manager] bpy.data.filepath not accessible in on_load_post_handler")
+            print(f"[Blender Manager] Project loaded: {project_path} at {time.ctime(project_open_time)}")
+    except Exception as e:
+        print(f"[Blender Manager] Error in on_load_post_handler: {e}")
 
 @persistent
 def on_quit_pre_handler(dummy):
@@ -182,9 +195,15 @@ def register():
     global project_open_time, project_path
     filepath = getattr(bpy.data, 'filepath', None)
     if filepath:
-        project_path = filepath
+        project_path = os.path.abspath(os.path.normpath(filepath))
         project_open_time = time.time()
         print(f"[Blender Manager] Existing project detected: {project_path} at {time.ctime(project_open_time)}")
+
+        autosaved_projects = load_autosaved_projects()
+        if project_path in autosaved_projects:
+            autosave_data = autosaved_projects[project_path]
+            activate_autosave(autosave_data)
+            print(f"[Blender Manager] Autosave settings applied for project: {project_path}")
     else:
         project_path = None
         project_open_time = time.time()
@@ -192,16 +211,16 @@ def register():
 
     bpy.app.handlers.save_post.append(on_save_post_handler)
     bpy.app.handlers.load_post.append(on_load_post_handler)
-
+    print("[Blender Manager] on_load_post_handler registered.")
     if hasattr(bpy.app.handlers, 'quit_pre'):
         bpy.app.handlers.quit_pre.append(on_quit_pre_handler)
         print("[Blender Manager] Quit pre handler appended.")
-    else:
-        print("[Blender Manager] 'quit_pre' handler not found. Quit event may not be tracked.")
 
     blender_manager_operator.register()
 
     print("[Blender Manager] Blender Manager Plugin registered.")
+
+
 
 def unregister():
     """Unregister the addon and remove its handlers."""
