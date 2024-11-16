@@ -34,6 +34,9 @@ import multiprocessing
 import traceback
 import tempfile
 import ast 
+import certifi
+import ssl
+
 end_time = time.time()
 print(f"imports loaded in {end_time - start_time}.") 
 CONFIG_FILE_PATH = os.path.join(os.path.expanduser("~"), ".BlenderManager", "config.json")
@@ -3711,6 +3714,9 @@ For further details, please refer to the user manual or visit our support site."
         for item in os.listdir(addons_dir):
             item_path = os.path.join(addons_dir, item)
 
+            if item == "__pycache__" or item.endswith(".pyc"):
+                continue
+
             if os.path.isdir(item_path):
                 version, compatible = self.get_plugin_info(item_path)
                 self.plugins_tree.insert('', 'end', values=(item, version, compatible))
@@ -3722,10 +3728,28 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
+
     def get_plugin_info(self, addon_path):
         """Read the plugin's bl_info to extract version and compatibility information."""
         version = "Unknown"
         compatible = "Unknown"
+
+        def extract_bl_info(file_path):
+            """Extract bl_info dictionary from a Python file."""
+            try:
+                # BOM karakterini atlamak için 'utf-8-sig' encoding formatını kullanıyoruz.
+                with open(file_path, 'r', encoding='utf-8-sig') as f:
+                    content = f.read()
+                    tree = ast.parse(content, filename=file_path)
+
+                    for node in tree.body:
+                        if isinstance(node, ast.Assign):
+                            for target in node.targets:
+                                if isinstance(target, ast.Name) and target.id == 'bl_info':
+                                    return ast.literal_eval(node.value)
+            except Exception as e:
+                print(f"Failed to read bl_info from {file_path}: {e}")
+            return None
 
         if addon_path.endswith('.py'):
             info_file = addon_path
@@ -3733,24 +3757,21 @@ For further details, please refer to the user manual or visit our support site."
             info_file = os.path.join(addon_path, "__init__.py")
 
         if os.path.exists(info_file):
-            try:
-                with open(info_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    bl_info = {}
-                    tree = ast.parse(content, filename=info_file)
+            bl_info = extract_bl_info(info_file)
+            if bl_info:
+                version = ".".join(map(str, bl_info.get('version', [])))
+                compatible = ", ".join(map(str, bl_info.get('blender', ["Unknown"])))
+                return version, compatible
 
-                    for node in tree.body:
-                        if isinstance(node, ast.Assign):
-                            for target in node.targets:
-                                if isinstance(target, ast.Name) and target.id == 'bl_info':
-                                    bl_info = ast.literal_eval(node.value)
-                                    break
-
+        for root, dirs, files in os.walk(addon_path):
+            for file in files:
+                if file == "__init__.py":
+                    init_file_path = os.path.join(root, file)
+                    bl_info = extract_bl_info(init_file_path)
                     if bl_info:
                         version = ".".join(map(str, bl_info.get('version', [])))
                         compatible = ", ".join(map(str, bl_info.get('blender', ["Unknown"])))
-            except Exception as e:
-                print(f"Failed to read bl_info from {info_file}: {e}")
+                        return version, compatible
 
         return version, compatible
  
@@ -4067,11 +4088,10 @@ For further details, please refer to the user manual or visit our support site."
 
         self.projects_tree = ttk.Treeview(
             projects_frame,
-            columns=('Project Name', 'Last Modified', 'Size'),
+            columns=('Project Name', 'Last Modified', 'Size', 'Last Blender Version'),
             show='headings',
             selectmode='browse',
             style='ProjectManagement.Treeview'
-            
         )
         
         self.projects_tree.drop_target_register(DND_FILES)
@@ -4083,6 +4103,8 @@ For further details, please refer to the user manual or visit our support site."
         self.projects_tree.column('Last Modified', width=200, anchor='center')
         self.projects_tree.column('Size', width=100, anchor='center')
         self.projects_tree.pack(side='right', fill='both', expand=1)
+        self.projects_tree.heading('Last Blender Version', text='Blender Ver.')
+        self.projects_tree.column('Last Blender Version', width=150, anchor='center')
 
         scrollbar = ttk.Scrollbar(projects_frame, orient="vertical", command=self.projects_tree.yview)
         self.projects_tree.configure(yscroll=scrollbar.set)
@@ -4097,6 +4119,38 @@ For further details, please refer to the user manual or visit our support site."
 
 
         #-----------Functions----------#
+        
+
+
+    def get_blend_version(self, file_path):
+        try:
+            with open(file_path, 'rb') as f:
+                header = f.read(12)
+
+                if not header.startswith(b'BLENDER'):
+                    return "4.2+"
+
+                version_bytes = header[9:12]
+
+                version_str = version_bytes.decode('ascii')
+
+                if not version_str.isdigit():
+                    return "Unknown"
+
+                version_num = int(version_str)
+
+                major = version_num // 100
+                minor = version_num % 100
+
+                return f"{major}.{minor}"
+
+        except Exception as e:
+            print(f"Error reading Blender version from {file_path}: {e}")
+            return "Compressed Format"
+
+
+
+
 
 
     def on_search_change(self, *args): 
@@ -4117,7 +4171,7 @@ For further details, please refer to the user manual or visit our support site."
                     project_directory = config_data.get('project_directory')
 
                     if not project_directory or not os.path.isdir(project_directory):
-                        messagebox.showerror("Error", "Project directory not found or invalid. Please check the configuration.")
+                        print("Project directory not found or invalid.")
                         return
 
                     project_path = os.path.join(project_directory, project_name)
@@ -4149,8 +4203,11 @@ For further details, please refer to the user manual or visit our support site."
             if query in item.lower():
                 item_path = os.path.join(project_dir, item)
                 last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(item_path)))
-                size = os.path.getsize(item_path) / (1024 * 1024)  
-                self.projects_tree.insert('', 'end', values=(item, last_modified, f"{size:.2f} MB"))
+                size = os.path.getsize(item_path) / (1024 * 1024)
+                blender_version = self.get_blend_version(item_path) if item_path.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')) else "N/A"
+            
+                self.projects_tree.insert('', 'end', values=(item, last_modified, f"{size:.2f} MB", blender_version))
+
 
 
 
@@ -4322,19 +4379,24 @@ For further details, please refer to the user manual or visit our support site."
                     owner_uid = stats.st_uid
                     group_gid = stats.st_gid
 
+                    # Time Spent bilgisi (dosya adıyla eşleştirme)
                     time_spent = 'Unknown'
                     json_path = os.path.expanduser(r'~\.BlenderManager\mngaddon\project_time.json')
                     if os.path.exists(json_path):
                         try:
                             with open(json_path, 'r', encoding='utf-8') as json_file:
                                 time_data = json.load(json_file)
-                            # Use absolute path as key
-                            abs_project_path = os.path.abspath(project_path)
-                            time_in_seconds = time_data.get(abs_project_path, None)
-                            if time_in_seconds is not None:
-                                hours, remainder = divmod(time_in_seconds, 3600)
-                                minutes, seconds = divmod(remainder, 60)
-                                time_spent = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+
+                            # Dosya adını al (tam dosya yolu yerine)
+                            project_basename = os.path.basename(project_path)
+
+                            # Zaman kaydını bulmaya çalış
+                            for file_path, time_in_seconds in time_data.items():
+                                if os.path.basename(file_path) == project_basename:
+                                    hours, remainder = divmod(time_in_seconds, 3600)
+                                    minutes, seconds = divmod(remainder, 60)
+                                    time_spent = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+                                    break
                         except Exception as e:
                             time_spent = f"Error reading time data: {e}"
 
@@ -4365,6 +4427,8 @@ For further details, please refer to the user manual or visit our support site."
         else:
             messagebox.showwarning("Warning", "No project selected.")
 
+
+
             
 
     def save_project_directory(self, directory):
@@ -4390,12 +4454,16 @@ For further details, please refer to the user manual or visit our support site."
 
         project_dir = self.project_directory_path.get()
         if not os.path.exists(project_dir):
-            messagebox.showerror("Error", f"Project directory not found: {project_dir}")
             return
 
-        self.insert_directory('', project_dir)
+        for item in os.listdir(project_dir):
+            item_path = os.path.join(project_dir, item)
+            last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(item_path)))
+            size = os.path.getsize(item_path) / (1024 * 1024)
+            blender_version = self.get_blend_version(item_path) if item_path.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')) else "N/A"
+        
+            self.projects_tree.insert('', 'end', values=(item, last_modified, f"{size:.2f} MB", blender_version))
 
-        self.projects_tree.bind("<<TreeviewOpen>>", self.on_treeview_open)
 
 
     def insert_directory(self, parent, path):
@@ -4910,9 +4978,11 @@ For further details, please refer to the user manual or visit our support site."
         self.cancel_button.pack(fill='x', pady=(5, 10), padx=(0, 10))
         self.cancel_button.pack_forget()
 
-        self.tree = ttkb.Treeview(right_frame, columns=("Version"), show="headings", height=20, style="Custom.Treeview")
+        self.tree = ttkb.Treeview(right_frame, columns=("Version", "Release Date"), show="headings", height=20, style="Custom.Treeview")
         self.tree.heading("Version", text="Blender Version")
+        self.tree.heading("Release Date", text="Release Date")
         self.tree.column("Version", anchor="center")
+        self.tree.column("Release Date", anchor="center")
         self.tree.pack(expand=True, fill="both")
         
         self.download_links = {}
@@ -5008,9 +5078,12 @@ For further details, please refer to the user manual or visit our support site."
 
         base_url = "https://download.blender.org/release/"
 
+        # SSL context oluştur
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(base_url) as response:
+                async with session.get(base_url, ssl=ssl_context) as response:
                     response.raise_for_status()
                     html = await response.text()
                     soup = BeautifulSoup(html, "html.parser")
@@ -5020,82 +5093,106 @@ For further details, please refer to the user manual or visit our support site."
                         self.queue.put(('ERROR', "No stable versions found."))
                         return
 
-                    versions, links = await self.fetch_all_versions(version_links, platform, architecture, session)
+                    versions, links, dates = await self.fetch_all_versions(version_links, platform, architecture, session, ssl_context)
+
 
                     if not versions:
                         self.queue.put(('ERROR', "No stable versions found for the selected platform."))
                         return
 
-                    self.queue.put(('UPDATE_TREEVIEW', versions, links))
+                    self.queue.put(('UPDATE_TREEVIEW', versions, links, dates))
 
         except Exception as e:
             self.queue.put(('ERROR', f"An unexpected error occurred: {str(e)}"))
 
-    async def fetch_all_versions(self, version_links, platform, architecture, session):
+    async def fetch_all_versions(self, version_links, platform, architecture, session, ssl_context):
         base_url = "https://download.blender.org/release/"
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
         tasks = [
-            self.fetch_version_page(session, base_url + version_link, platform, architecture)
+            self.fetch_version_page(session, base_url + version_link, platform, architecture, ssl_context)
             for version_link in version_links
         ]
         results = await asyncio.gather(*tasks)
 
         versions = []
         links = {}
-        for v, l in results:
+        dates = {}
+        for v, l, d in results:
             versions.extend(v)
             links.update(l)
+            dates.update(d)
 
-        return versions, links
+        return versions, links, dates
 
-    async def fetch_version_page(self, session, version_url, platform, architecture):
+    async def fetch_version_page(self, session, version_url, platform, architecture, ssl_context):
         try:
-            async with session.get(version_url) as response:
+            async with session.get(version_url, ssl=ssl_context) as response:
                 response.raise_for_status()
                 html = await response.text()
                 version_soup = BeautifulSoup(html, "html.parser")
 
-                download_links = [a['href'] for a in version_soup.find_all('a', href=True)]
+                pre_tag = version_soup.find("pre")
+                if not pre_tag:
+                    return [], {}, {}
+
+                lines = pre_tag.text.splitlines()
                 versions = []
                 links = {}
+                dates = {}
 
-                for download_link in download_links:
-                    if download_link.endswith(".sha256") or download_link.endswith(".md5"):
+                for line in lines:
+                    # Satırda hem dosya adı hem de tarih bilgisi olmalı
+                    parts = line.split()
+                    if len(parts) < 3:
                         continue
 
-                    full_link = version_url + download_link
+                    file_name = parts[0]
+                    date_str = " ".join(parts[1:3])  # Örneğin: "11-Sep-2017 13:19"
+
+                    if file_name.endswith(".sha256") or file_name.endswith(".md5"):
+                        continue
+
+                    full_link = version_url + file_name
                     try:
-                        version_name = "Blender " + download_link.split('-')[1]
+                        version_name = "Blender " + file_name.split('-')[1]
                     except IndexError:
                         version_name = "Blender " + version_url.strip('/').split('/')[-1]
 
                     if platform == "windows":
-                        is_64bit = "x64" in download_link or "windows64" in download_link
-                        is_32bit = "x86" in download_link or "windows32" in download_link
-                        is_generic = "windows" in download_link and not (is_64bit or is_32bit)
+                        is_64bit = "x64" in file_name or "windows64" in file_name
+                        is_32bit = "x86" in file_name or "windows32" in file_name
+                        is_generic = "windows" in file_name and not (is_64bit or is_32bit)
 
                         if architecture == "x64" and (is_64bit or is_generic):
-                            if download_link.endswith(".zip"):
+                            if file_name.endswith(".zip"):
                                 versions.append(version_name)
                                 links[version_name] = full_link
+                                dates[version_name] = date_str
 
                         elif architecture == "x86" and (is_32bit or is_generic):
-                            if download_link.endswith(".zip"):
+                            if file_name.endswith(".zip"):
                                 versions.append(version_name)
                                 links[version_name] = full_link
+                                dates[version_name] = date_str
 
                     elif platform == "darwin":
-                        if ("darwin" in download_link or "macos" in download_link) and architecture in download_link and download_link.endswith(".dmg"):
+                        if ("darwin" in file_name or "macos" in file_name) and architecture in file_name and file_name.endswith(".dmg"):
                             versions.append(version_name)
                             links[version_name] = full_link
+                            dates[version_name] = date_str
 
                     elif platform == "linux":
-                        if "linux" in download_link and (download_link.endswith(".tar.xz") or download_link.endswith(".tar.gz")):
+                        if "linux" in file_name and (file_name.endswith(".tar.xz") or file_name.endswith(".tar.gz")):
                             versions.append(version_name)
                             links[version_name] = full_link
+                            dates[version_name] = date_str
 
-            return versions, links
+                return versions, links, dates
         except Exception as e:
-            return [], {}
+            return [], {}, {}
+
+
+
 
 
     def get_unstable_versions(self):
@@ -5133,7 +5230,6 @@ For further details, please refer to the user manual or visit our support site."
             architecture = "is-arch-amd64"
 
         url = "https://builder.blender.org/download/daily/archive/"
-
         print(f"Fetching versions for platform: {platform}, architecture: {architecture}")
 
         try:
@@ -5143,7 +5239,9 @@ For further details, please refer to the user manual or visit our support site."
 
             versions = []
             links = {}
+            dates = {}
 
+            # Unstable versiyonları listeleyen build elemanlarını çek
             builds = soup.select(f'div.builds-list-container[data-platform="{platform}"] li.t-row.build')
 
             if not builds:
@@ -5152,6 +5250,7 @@ For further details, please refer to the user manual or visit our support site."
                 messagebox.showerror("Error", "No versions found. The site structure may have changed.")
                 return
 
+            # Versiyon, link ve tarih bilgilerini çek
             for build in builds:
                 classes = build.get("class", [])
                 if architecture and architecture not in classes:
@@ -5160,10 +5259,14 @@ For further details, please refer to the user manual or visit our support site."
                 version_element = build.select_one(".t-cell.b-version")
                 download_element = build.select_one(".t-cell.b-down a")
 
+                # Varsayılan tarih bilgisi
+                release_date = "Unknown Date"
+
                 if version_element and download_element:
                     version = version_element.text.strip()
                     download_link = download_element["href"]
 
+                    # SHA dosyalarını filtrele
                     if download_link.endswith(".sha256"):
                         download_link = download_link.replace(".sha256", "")
 
@@ -5173,12 +5276,14 @@ For further details, please refer to the user manual or visit our support site."
                     if version not in versions:
                         versions.append(version)
                         links[version] = download_link
+                        dates[version] = release_date
 
             if not versions:
                 messagebox.showerror("Error", "No versions found.")
                 return
 
-            self.queue.put(('UPDATE_TREEVIEW', versions, links))
+            # TreeView'i güncelle, tarih bilgisi "Unknown Date" olarak varsayılan ayarlanmış durumda
+            self.queue.put(('UPDATE_TREEVIEW', versions, links, dates))
             self.get_unstable_btn.config(text="Get Unstable Versions", state='normal')
             print("Versions successfully fetched and listed.")
 
@@ -5186,6 +5291,7 @@ For further details, please refer to the user manual or visit our support site."
             print("Error fetching versions:", str(e))
             self.get_unstable_btn.config(text="Get Unstable Versions", state='normal')
             messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
+
 
     def install_version(self):
         if self.is_installing:
@@ -5392,15 +5498,35 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
-
                 elif isinstance(message, tuple) and message[0] == 'UPDATE_TREEVIEW':
                     versions = message[1]
                     links = message[2]
+                    dates = message[3]
+
+                    def parse_version(version):
+                        try:
+                            version_number = version.split(" ")[1]
+                            if all(part.isdigit() for part in version_number.split(".")):
+                                return list(map(int, version_number.split(".")))
+                            else:
+                                return [0]
+                        except (IndexError, ValueError):
+                            return [0]
+
+                    # Sürüm numaralarını büyükten küçüğe doğru sıralama
+                    sorted_versions = sorted(versions, key=parse_version, reverse=True)
+
                     self.tree.delete(*self.tree.get_children())
-                    for version in versions:
-                        self.tree.insert("", "end", values=(version,))
+                    for version in sorted_versions:
+                        # Dosya adına göre tarih bilgisini al
+                        release_date = dates.get(version, "Unknown Date")
+                        self.tree.insert("", "end", values=(version, release_date))
                         self.download_links[version] = links[version]
+
                     self.queue.task_done()
+
+
+
                     
                 elif isinstance(message, tuple):
                     if message[0] == 'ERROR':
