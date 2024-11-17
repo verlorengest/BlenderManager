@@ -2,6 +2,8 @@
 
 Blender Manager includes several powerful features designed to streamline project setup and tracking, all without the need to open Blender initially. Here’s a closer look at some of its standout functionalities:
 
+<details>
+<summary>**Features**</summary>
 ### 1. **Project Time Tracking**
 Blender Manager automatically tracks the time spent on each project, giving users a clear view of their work hours. This feature is integrated directly into the **Recent Projects** section, where the total time spent on a project is displayed. Users can monitor their productivity and get a detailed breakdown of working hours for each project, making it an excellent tool for both personal time management and client billing.
 
@@ -82,49 +84,69 @@ The **Settings** tab in Blender Manager is designed to give users full control o
 - **Delete Main Blender**: Provides an option to delete the primary Blender installation.
 - **Reset to Defaults**: Restores all settings to their default values, providing a quick way to revert changes if needed.
 
+</details>
 
+<details>
+<summary>🛠️ **Blender Manager Installation Guide**</summary>
 
-# Blender Manager Installation Guide
+Follow these steps to install and set up Blender Manager on your system.
 
+---
 
+## Step 1: Download and Extract the ZIP File
 
-## Step 1: Extract the ZIP File
+1. **Download the Blender Manager ZIP file**  
+   📥 [**Download Latest Release**](https://github.com/verlorengest/BlenderManager/releases)
 
-1. **Download** the Blender Manager ZIP file.
-2. **Extract** the contents of the ZIP file to your desired location on your computer.
-   - Right-click on the ZIP file and select **"Extract All"** or use a third-party application like WinRAR or 7-Zip.
-3. After extraction, you should see a folder named **"BlenderManager"** (or similar).
+2. **Extract the ZIP file** to a location of your choice:
+   - Right-click the ZIP file and select **"Extract All"** or use a third-party tool like **WinRAR** or **7-Zip**.
+   - After extraction, you’ll find a folder named **"BlenderManager"**.
+
+---
 
 ## Step 2: Launch Blender Manager
 
-1. Open the extracted folder.
+1. Open the **BlenderManager** folder.
 2. Double-click on **`blender_manager.exe`** to start the application.
-   - If you see a security prompt, click **"Run Anyway"** to proceed.
+   - If a security prompt appears, click **"Run Anyway"**.
 
-## Step 3: Setup the Addon
+---
 
-1. Make sure Blender is installed on your system. If not, please install Blender before proceeding.
-2. Open the application and navigate to the Settings tab in the menu.
-3. Click on the "Setup Addon" button.
-4. The application will automatically detect all installed Blender versions and install the addon.
-5. Wait for the process to complete. You should see a confirmation message once the addon is successfully installed.
+## Step 3: Setup the Blender Addon
 
-## Step 4: Verify Installation
+1. Ensure **Blender is already installed** on your system.
+2. Open Blender Manager and go to the **Settings** tab.
+3. Click the **"Setup Addon"** button.
+   - The application will automatically detect all installed Blender versions and install the addon.
+4. Wait for the process to complete. A confirmation message will appear once the addon is successfully installed.
 
-1. Open Blender.
-2. Go to **Edit** > **Preferences** > **Add-ons**.
-3. Search for **"Blender Manager"** in the search bar.
-4. Ensure that the addon is enabled (checkbox is checked).
-5. Restart Blender.
+---
 
+## Step 4: Verify the Addon Installation
 
-## You're All Set!
+1. Launch **Blender**.
+2. Navigate to **Edit** > **Preferences** > **Add-ons**.
+3. In the search bar, type **"Blender Manager"**.
+4. Ensure the addon is enabled (checkbox is checked).
+5. Restart Blender for the changes to take effect.
 
-Your Blender Manager is now installed and ready to use. Enjoy enhanced management of your Blender projects!
+---
 
-If you have any issues or questions, please refer to the troubleshooting section or contact support for further assistance.
+## 🎉 You're All Set!
 
-Donate links:
-https://verlorengest.gumroad.com/l/blendermanager
-https://buymeacoffee.com/verlorengest
+Blender Manager is now installed and ready to enhance your Blender workflow. Enjoy streamlined project management and efficient tool integration!
+
+---
+
+</details>
+
+## 💖 Support Blender Manager
+
+Blender Manager is free and open-source. If you find it helpful, consider supporting the project:
+
+- [**Donate on Gumroad**](https://verlorengest.gumroad.com/l/blendermanager)  
+- [**Buy Me a Coffee**](https://buymeacoffee.com/verlorengest) ☕
+
+Your support helps in maintaining and improving the project. Thank you!
+
 
