@@ -25,6 +25,7 @@ import threading
 import queue 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import tkinter.simpledialog as simpledialog
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import ttkbootstrap as ttkb
 from ttkbootstrap.constants import *
@@ -1604,7 +1605,7 @@ For further details, please refer to the user manual or visit our support site."
                 "- Marketplace for addons and 3D models to add your project easily.\n"
                 "\n"
                 "If you enjoy using this application,\n"
-                "consider supporting us! ~ ♡"
+                "consider supporting! ~ ♡"
             ),
             anchor="center"
         )
@@ -1624,7 +1625,7 @@ For further details, please refer to the user manual or visit our support site."
     def redirect_to_donation_page(self):
         """Redirects the user to the donation page."""
         import webbrowser
-        webbrowser.open("https://buymeacoffee.com/verlorengest")
+        webbrowser.open("https://verlorengest.gumroad.com/l/blendermanager")
 
 
         #-----------------------------------------------------------------------------------------------------------------------------------
@@ -3404,7 +3405,6 @@ For further details, please refer to the user manual or visit our support site."
         directory_frame = ttk.Frame(plugins_frame)
         directory_frame.pack(fill='x', padx=10, pady=(0, 5))
 
-        # Directory Entry
         self.directory_path = tk.StringVar(value=self.load_plugin_directory())
         self.directory_entry = ttk.Entry(directory_frame, textvariable=self.directory_path, width=50)
         self.directory_entry.grid(row=0, column=0, padx=(0, 5), sticky='w')
@@ -3429,7 +3429,6 @@ For further details, please refer to the user manual or visit our support site."
         )
         self.go_to_button.grid(row=0, column=2, padx=(0, 5), sticky='e')
 
-        # Blender Version Label
         version_label = ttk.Label(
             directory_frame,
             text="Blender Version:",
@@ -3437,7 +3436,6 @@ For further details, please refer to the user manual or visit our support site."
         )
         version_label.grid(row=0, column=3, padx=(10, 5), sticky='e')
 
-        # Blender Version Selection Combobox
         self.blender_versions = self.get_blender_versions_for_plugins()
         self.version_var = tk.StringVar()
         self.version_combobox = ttk.Combobox(
@@ -3450,7 +3448,6 @@ For further details, please refer to the user manual or visit our support site."
         self.version_combobox.grid(row=0, column=4, padx=(0, 10), sticky='e')
         self.version_combobox.bind("<<ComboboxSelected>>", self.on_blender_for_plugins_version_selected)
 
-        # Plugin Search
         self.plugin_search_var = tk.StringVar()
         self.plugin_search_var.trace("w", lambda *args: self.on_plugin_search_change())
 
@@ -3463,7 +3460,6 @@ For further details, please refer to the user manual or visit our support site."
         )
         self.plugin_search_entry.pack(anchor='w', padx=10, pady=(0, 10))
 
-        # Placeholder text setup
         self.plugin_placeholder_text = "Search Addons"
         self.plugin_search_entry.insert(0, self.plugin_placeholder_text)
         self.plugin_search_entry.configure(foreground="grey")
@@ -3737,7 +3733,6 @@ For further details, please refer to the user manual or visit our support site."
         def extract_bl_info(file_path):
             """Extract bl_info dictionary from a Python file."""
             try:
-                # BOM karakterini atlamak için 'utf-8-sig' encoding formatını kullanıyoruz.
                 with open(file_path, 'r', encoding='utf-8-sig') as f:
                     content = f.read()
                     tree = ast.parse(content, filename=file_path)
@@ -3817,21 +3812,17 @@ For further details, please refer to the user manual or visit our support site."
                 with zipfile.ZipFile(file_path, 'r') as zip_ref:
                     namelist = zip_ref.namelist()
 
-                    # Determine if the zip has a single top-level folder
                     top_level_items = set()
                     for name in namelist:
-                        # Ignore directory entries
                         if name.endswith('/'):
                             continue
                         top_level_dir = name.split('/')[0]
                         top_level_items.add(top_level_dir)
 
                     if len(top_level_items) == 1:
-                        # Zip has a single top-level folder or file, extract as is
                         zip_ref.extractall(addons_dir)
                         print(f"Extracted {file_path} to {addons_dir}")
                     else:
-                        # Create a folder with the same name as the zip file
                         folder_name = os.path.splitext(basename)[0]
                         extract_path = os.path.join(addons_dir, folder_name)
                         os.makedirs(extract_path, exist_ok=True)
@@ -3985,15 +3976,33 @@ For further details, please refer to the user manual or visit our support site."
         self.project_go_to_button = ttk.Button(
             project_directory_frame,
             text="Go to File Path",
+            takefocus=False,
             command=self.go_to_project_file_path,
             style='Custom.TButton'
         )
         self.project_go_to_button.pack(side='left', padx=(0, 5))
+        
+        self.add_project_button = ttk.Button(
+            project_directory_frame,
+            text="Add Project",
+            takefocus=False,
+            command=self.add_project,
+            style='Custom.TButton'
+        )
+        self.add_project_button.pack(side='left', padx=(0, 5))
+        
+        self.refresh_projects_button = ttk.Button(
+            project_directory_frame,
+            text="Refresh",
+            takefocus=False,
+            command=self.refresh_projects_list,
+            style='Custom.TButton'
+        )
+        self.refresh_projects_button.pack(side='left', padx=(0, 5))
 
-        # Project Search
+
         self.project_search_var = tk.StringVar()
         self.project_search_var.trace("w", self.on_search_change)
-
 
         self.project_search_entry = ttk.Entry(
             projects_frame,
@@ -4002,115 +4011,76 @@ For further details, please refer to the user manual or visit our support site."
         )
         self.project_search_entry.pack(anchor='w', padx=10, pady=(0, 10))
 
-        # Placeholder text
         self.placeholder_text = "Search Projects"
         self.project_search_entry.insert(0, self.placeholder_text)
         self.project_search_entry.configure(foreground="grey")
 
         def on_entry_click(event):
+            """Handle entry click to clear the placeholder text without resetting TreeView."""
             if self.project_search_entry.get() == self.placeholder_text:
                 self.project_search_entry.delete(0, "end")
                 self.project_search_entry.configure(foreground="black")
 
+
         def on_focus_out(event):
-            if not self.project_search_entry.get():
-                self.project_search_entry.insert(0, self.placeholder_text)
+            """Handle focus out event to reset the search entry and restore TreeView content if search is empty."""
+            query = self.project_search_var.get().strip()
+            if not query:
                 self.project_search_entry.configure(foreground="grey")
-
-
+                self.project_search_entry.delete(0, "end")
+                self.project_search_entry.insert(0, self.placeholder_text)
+                self.refresh_projects_list()  
 
         self.project_search_entry.bind("<FocusIn>", on_entry_click)
         self.project_search_entry.bind("<FocusOut>", on_focus_out)
 
 
-        project_buttons_frame = ttk.Frame(projects_frame)
-        project_buttons_frame.pack(side='left', padx=(10, 10), fill='y')
-
-        self.add_project_button = ttk.Button(
-            project_buttons_frame,
-            text="Add",
-            takefocus=False,
-            command=self.add_project,
-            style='Custom.TButton',
-            padding=(15, 10)  # Larger padding for bigger buttons
-        )
-        self.add_project_button.pack(pady=(10, 10), fill='x')
-
-        # Remove Project Button
-        self.remove_project_button = ttk.Button(
-            project_buttons_frame,
-            text="Remove",
-            takefocus=False,
-            command=self.remove_project,
-            style='Custom.TButton',
-            padding=(15, 10)
-        )
-        self.remove_project_button.pack(pady=(10, 10), fill='x')
-
-        # View Project Content Button
-        self.view_project_button = ttk.Button(
-            project_buttons_frame,
-            text="Info",
-            takefocus=False,
-            command=self.view_project_content,
-            style='Custom.TButton',
-            padding=(15, 10)
-        )
-        self.view_project_button.pack(pady=(10, 10), fill='x')
-
-        # Open Project Button
-        self.open_project_button = ttk.Button(
-            project_buttons_frame,
-            text="Open",
-            takefocus=False,
-            command=self.open_project,
-            style='Custom.TButton',
-            padding=(15, 10)
-        )
-        self.open_project_button.pack(pady=(10, 10), fill='x')
-
-        # Refresh List Button
-        self.refresh_projects_button = ttk.Button(
-            project_buttons_frame,
-            text="Refresh",
-            takefocus=False,
-            command=self.refresh_projects_list,
-            style='Custom.TButton',
-            padding=(15, 10)
-        )
-        self.refresh_projects_button.pack(pady=(10, 10), fill='x')
-        
-
         style = ttkb.Style()
-        self.style.configure("ProjectManagement.Treeview", font=('Segoe UI', 12), rowheight=30)  
-        self.style.configure("ProjectManagement.Treeview.Heading", font=('Segoe UI', 14, 'bold'))  
-
+        self.style.configure("ProjectManagement.Treeview", font=('Segoe UI', 12), rowheight=30)
+        self.style.configure("ProjectManagement.Treeview.Heading", font=('Segoe UI', 14, 'bold'))
 
         self.projects_tree = ttk.Treeview(
             projects_frame,
-            columns=('Project Name', 'Last Modified', 'Size', 'Last Blender Version'),
-            show='headings',
+            columns=('Last Modified', 'Size', 'Last Blender Version'),
+            show='tree headings',
             selectmode='browse',
             style='ProjectManagement.Treeview'
         )
-        
-        self.projects_tree.drop_target_register(DND_FILES)
-        self.projects_tree.dnd_bind('<<Drop>>', self.handle_project_treeview_drop)
-        self.projects_tree.heading('Project Name', text='Project Name')
+
+        self.projects_tree.heading('#0', text='Project Name')
+        self.projects_tree.column('#0', width=300, anchor='w')
+
         self.projects_tree.heading('Last Modified', text='Last Modified')
-        self.projects_tree.heading('Size', text='Size')
-        self.projects_tree.column('Project Name', width=300, anchor='center')
         self.projects_tree.column('Last Modified', width=200, anchor='center')
+
+        self.projects_tree.heading('Size', text='Size')
         self.projects_tree.column('Size', width=100, anchor='center')
-        self.projects_tree.pack(side='right', fill='both', expand=1)
+
         self.projects_tree.heading('Last Blender Version', text='Blender Ver.')
         self.projects_tree.column('Last Blender Version', width=150, anchor='center')
+
+        self.projects_tree.pack(side='right', fill='both', expand=1)
 
         scrollbar = ttk.Scrollbar(projects_frame, orient="vertical", command=self.projects_tree.yview)
         self.projects_tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side='right', fill='y')
+        self.projects_tree.bind("<<TreeviewOpen>>", self.on_treeview_open)
+        self.projects_tree.drop_target_register(DND_FILES)
+        self.projects_tree.dnd_bind('<<Drop>>', self.handle_project_treeview_drop)
+        self.load_folder_into_tree(self.project_directory_path.get(), "")
 
-        # Load initial project list
+        self.context_menu = tk.Menu(self.projects_tree, tearoff=0)
+        self.context_menu.add_command(label="Open", command=self.open_project_from_context)
+        self.context_menu.add_command(label="Rename", command=self.rename_project_from_context)
+        self.context_menu.add_command(label="Delete", command=self.remove_project_from_context)
+        self.context_menu.add_command(label="Export", command=self.export_project_from_context)
+        self.context_menu.add_command(label="Info", command=self.view_project_content_from_context)
+        self.move_menu = tk.Menu(self.context_menu, tearoff=0)
+        self.context_menu.add_cascade(label="Move to Folder", menu=self.move_menu)
+
+        self.projects_tree.bind("<Button-3>", self.show_context_menu)
+
+
         self.refresh_projects_list()
 
 
@@ -4120,6 +4090,346 @@ For further details, please refer to the user manual or visit our support site."
 
         #-----------Functions----------#
         
+
+    def show_context_menu(self, event):
+        """Show context menu on right-click."""
+        selected_item = self.projects_tree.identify_row(event.y)
+        if selected_item:
+            self.projects_tree.selection_set(selected_item)
+            self.populate_move_menu(self.move_menu)
+            self.context_menu.post(event.x_root, event.y_root)
+    def open_project_from_context(self):
+        """Open the selected project file."""
+        self.open_project()
+    def rename_project_from_context(self):
+        """Rename the selected project file."""
+        self.rename_project()
+    def remove_project_from_context(self):
+        """Delete the selected project file."""
+        self.remove_project()
+    def export_project_from_context(self):
+        """Export the selected project file."""
+        self.export_project()
+    def view_project_content_from_context(self):
+        """View the content information of the selected project file."""
+        self.view_project_content()
+
+
+
+    def populate_move_menu(self, menu):
+        """Populate the Move to Folder submenu with all folders, including subdirectories."""
+        menu.delete(0, 'end')
+        project_root = self.project_directory_path.get()
+        self.add_folders_to_move_menu(menu, project_root)
+
+    def add_folders_to_move_menu(self, menu, folder_path):
+        """Recursively add all folders (excluding .blend files) to the move menu."""
+        try:
+            items = sorted(os.listdir(folder_path))
+            for item in items:
+                item_path = os.path.join(folder_path, item)
+
+                if os.path.isdir(item_path):
+                    submenu = tk.Menu(menu, tearoff=0)
+
+                    menu.add_cascade(
+                        label=item,
+                        menu=submenu
+                    )
+
+                    submenu.add_command(
+                        label="Select This Folder",
+                        command=lambda path=item_path: self.move_blend_file(self.get_item_full_path(self.projects_tree.focus()), path)
+                    )
+
+                    self.add_folders_to_move_menu(submenu, item_path)
+        except Exception as e:
+            print(f"Error in add_folders_to_move_menu: {e}")
+
+
+
+    def add_folders_to_menu(self, menu, parent_path, children):
+        """Add folders to the move menu recursively."""
+        for child in children:
+            item_text = self.projects_tree.item(child, 'text')
+            item_path = os.path.join(parent_path, item_text)
+
+            if os.path.isdir(self.get_item_full_path(child)):
+                submenu = tk.Menu(menu, tearoff=0)
+                menu.add_cascade(label=item_text, menu=submenu)
+                self.add_folders_to_menu(submenu, item_path, self.projects_tree.get_children(child))
+            else:
+                menu.add_command(
+                    label=item_text,
+                    command=lambda path=item_path: self.move_blend_file(self.get_item_full_path(self.projects_tree.focus()), path)
+                )
+
+
+    def move_blend_file(self, source_path, target_folder):
+        """Move a .blend file or folder to the specified target folder."""
+        try:
+            target_path = os.path.join(target_folder, os.path.basename(source_path))
+            if os.path.exists(target_path):
+                confirm = messagebox.askyesno("Confirm", f"File already exists in the target folder. Overwrite?")
+                if not confirm:
+                    return
+
+            shutil.move(source_path, target_path)
+            self.refresh_projects_list()
+            messagebox.showinfo("Success", f"Moved {os.path.basename(source_path)} to {target_folder}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to move file: {e}")
+
+
+
+
+
+    def export_project(self):
+        """Initialize the export process in a separate thread."""
+        selected_item = self.projects_tree.focus()
+        if not selected_item:
+            messagebox.showwarning("Warning", "No item selected.")
+            return
+
+        blend_path = self.get_item_full_path(selected_item)
+        if not os.path.isfile(blend_path) or not blend_path.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
+            messagebox.showerror("Error", "Selected item is not a .blend file.")
+            return
+
+        export_format = simpledialog.askstring(
+            "Export Format",
+            "Enter export format (fbx, gltf, abc):",
+            initialvalue="fbx"
+        )
+
+        if export_format not in ['fbx', 'obj', 'gltf', 'ply', 'stl', 'abc']:
+            messagebox.showerror("Error", "Invalid export format.")
+            return
+
+        output_dir = tk.filedialog.askdirectory(title="Select Export Directory")
+        if not output_dir:
+            return
+
+        output_file = os.path.splitext(os.path.basename(blend_path))[0] + f".{export_format}"
+        output_path = os.path.join(output_dir, output_file)
+
+        blender_path = os.path.expanduser("~/.blendermanager/blender/blender.exe")
+        if not os.path.exists(blender_path):
+            messagebox.showerror("Error", f"Blender executable not found at: {blender_path}")
+            return
+        self.show_exporting_message()
+        threading.Thread(target=self.run_export_process, args=(blend_path, output_path, export_format, blender_path)).start()
+
+    def run_export_process(self, blend_path, output_path, export_format, blender_path):
+        """Run the export process in a separate thread."""
+        blend_path = os.path.normpath(blend_path).encode('utf-8', errors='surrogateescape').decode('utf-8')
+        output_path = os.path.normpath(output_path).encode('utf-8', errors='surrogateescape').decode('utf-8')
+
+        temp_script_path = os.path.join(os.path.dirname(output_path), "temp_export_script.py")
+
+        try:
+            export_script = f"""
+import bpy
+bpy.ops.wm.open_mainfile(filepath=r'{blend_path}')
+
+if '{export_format}' == 'fbx':
+    bpy.ops.export_scene.fbx(
+        filepath=r'{output_path}',
+        use_selection=False,
+        embed_textures=True,
+        path_mode='COPY',
+        bake_space_transform=True,
+        apply_scale_options='FBX_SCALE_ALL',
+        mesh_smooth_type='FACE',
+        use_tspace=True,
+        use_mesh_modifiers=True,
+        use_triangles=True 
+    )
+elif '{export_format}' == 'gltf':
+    bpy.ops.export_scene.gltf(
+        filepath=r'{output_path}',
+        export_format='GLTF_SEPARATE',
+        export_materials='EXPORT',           
+        export_apply=True,                   
+        export_tangents=True,                
+        use_selection=False
+    )
+elif '{export_format}' == 'abc':
+    bpy.ops.wm.alembic_export(
+        filepath=r'{output_path}',
+        apply_scale=True,                     
+        visible_objects_only=True,           
+        flatten=False,                        
+        uv_write=True                         
+    )
+    """
+
+            with open(temp_script_path, 'w', encoding='utf-8') as temp_script:
+                temp_script.write(export_script)
+
+            if not os.path.exists(temp_script_path):
+                self.show_error_exporting("Temporary script file could not be created.")
+                return
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0  # SW_HIDE
+            subprocess.run(
+                [blender_path, "--background", "--factory-startup", "--python", temp_script_path],
+                check=True,
+                startupinfo=startupinfo
+            )
+            self.show_info_exporting(f"Exported to {output_path}")
+
+        except Exception as e:
+            self.show_error_exporting(f"Failed to export: {e}")
+
+        finally:
+
+            if os.path.exists(temp_script_path):
+                os.remove(temp_script_path)
+                
+            self.hide_exporting_message()
+
+    def show_error_exporting(self, message):
+        """Show error message in the main thread."""
+        self.after(0, lambda: messagebox.showerror("Error", message))
+
+    def show_info_exporting(self, message):
+        """Show info message in the main thread."""
+        self.after(0, lambda: messagebox.showinfo("Success", message))
+
+
+
+    def show_exporting_message(self):
+        """Show a temporary 'Exporting...' message next to the go to file path buttons."""
+        if hasattr(self, 'exporting_label'):
+            return  
+
+        self.exporting_label = ttk.Label(self.project_directory_entry.master, text="Exporting...", foreground="red")
+        self.exporting_label.pack(side='left', padx=(10, 0))
+
+    def hide_exporting_message(self):
+        """Hide the temporary 'Exporting...' message."""
+        if hasattr(self, 'exporting_label'):
+            self.exporting_label.destroy()
+            del self.exporting_label
+
+
+
+
+    def refresh_projects_list(self, query=None):
+        """
+        List all projects and their contents from the selected project directory with a maximum depth of 5.
+        """
+        self.projects_tree.delete(*self.projects_tree.get_children())
+
+        project_dir = self.project_directory_path.get()
+        if not os.path.exists(project_dir):
+            return
+
+        self.insert_directory('', project_dir, query, depth=0)
+
+    def insert_directory(self, parent, path, query=None, depth=0):
+        """
+        Recursively add directories and .blend files within a folder to the TreeView, up to a maximum depth of 5.
+        Folders without .blend files are not shown.
+        """
+        if depth >= 5:
+            return
+
+        try:
+            items = sorted(os.listdir(path))
+
+            for item in items:
+                item_path = os.path.join(path, item)
+
+                if os.path.isdir(item_path):
+                    if self.contains_blend_files(item_path):
+                        folder_id = self.projects_tree.insert(parent, 'end', text=item, values=("", "", ""), open=False)
+                        self.insert_directory(folder_id, item_path, query, depth + 1)
+
+            for item in items:
+                item_path = os.path.join(path, item)
+
+                if item.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
+                    if query is None or query.lower() in item.lower():
+                        last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(item_path)))
+                        size = os.path.getsize(item_path) / (1024 * 1024)
+                        blender_version = self.get_blend_version(item_path)
+                        self.projects_tree.insert(parent, 'end', text=item, values=(last_modified, f"{size:.2f} MB", blender_version))
+        except Exception as e:
+            print(f"Error in insert_directory: {e}")
+
+    def contains_blend_files(self, directory):
+        """
+        Check if a directory or its subdirectories contain any .blend files.
+        """
+        try:
+            for root, _, files in os.walk(directory):
+                for file in files:
+                    if file.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
+                        return True
+            return False
+        except Exception as e:
+            print(f"Error in contains_blend_files: {e}")
+            return False
+
+
+
+
+
+
+
+
+    def rename_project(self):
+        """Rename the selected project or folder, keeping the file extension unchanged for files."""
+        selected_item = self.projects_tree.focus()
+        if not selected_item:
+            messagebox.showwarning("Warning", "No item selected.")
+            return
+
+        project_path = self.get_item_full_path(selected_item)
+        if not os.path.exists(project_path):
+            messagebox.showerror("Error", "Selected item does not exist.")
+            return
+
+        current_name = os.path.basename(project_path)
+        is_file = os.path.isfile(project_path)
+        file_extension = os.path.splitext(current_name)[1] if is_file else ''
+        initial_name = os.path.splitext(current_name)[0] if is_file else current_name
+
+        new_name = simpledialog.askstring("Rename", "Enter new name:", initialvalue=initial_name)
+        if new_name and new_name != initial_name:
+            if is_file:
+                new_name_with_ext = new_name + file_extension
+            else:
+                new_name_with_ext = new_name
+
+            new_path = os.path.join(os.path.dirname(project_path), new_name_with_ext)
+
+            if os.path.exists(new_path):
+                messagebox.showerror("Error", "A file or folder with that name already exists.")
+                return
+
+            try:
+                os.rename(project_path, new_path)
+                messagebox.showinfo("Success", f"Renamed to '{new_name_with_ext}'.")
+                self.refresh_projects_list()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to rename: {e}")
+        else:
+            print("Rename cancelled or name unchanged.")
+
+
+
+    def get_item_full_path(self, item_id):
+        """Get the full file path of a TreeView item."""
+        parts = []
+        while item_id:
+            item_text = self.projects_tree.item(item_id, "text")
+            parts.insert(0, item_text)
+            item_id = self.projects_tree.parent(item_id)
+        return os.path.join(self.project_directory_path.get(), *parts)
 
 
     def get_blend_version(self, file_path):
@@ -4150,64 +4460,75 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
+    def on_search_change(self, *args):
+        """Filter the TreeView based on the search query and scroll to the matching item."""
+        query = self.project_search_var.get().strip().lower()
+        if not query or query == self.placeholder_text:
+            self.refresh_projects_list()
+        else:
+            self.projects_tree.delete(*self.projects_tree.get_children())
+            self.expand_and_search(self.project_directory_path.get(), query)
+
+    def expand_and_search(self, folder_path, query, parent_item=''):
+        """Recursively search, expand all directories, and scroll to the matching item."""
+        try:
+            items = sorted(os.listdir(folder_path))
+            for item in items:
+                item_path = os.path.join(folder_path, item)
+
+                if os.path.isdir(item_path):
+                    folder_id = self.projects_tree.insert(parent_item, 'end', text=item, values=("", "", ""), open=True)
+                    self.expand_and_search(item_path, query, folder_id)
+
+                elif item.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
+                    if query in item.lower():
+                        last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(item_path)))
+                        size = os.path.getsize(item_path) / (1024 * 1024)
+                        blender_version = self.get_blend_version(item_path)
+                        file_item = self.projects_tree.insert(parent_item, 'end', text=item, values=(last_modified, f"{size:.2f} MB", blender_version))
+
+                        self.projects_tree.see(file_item)
+                        self.projects_tree.focus(file_item)
+                        self.projects_tree.selection_set(file_item)
+                        self.scroll_to_item(file_item)
+        except Exception as e:
+            print(f"Error during search: {e}")
+
+    def scroll_to_item(self, item):
+        """Scroll the TreeView to make the specified item visible."""
+        try:
+            self.projects_tree.see(item)
+            self.projects_tree.focus(item)
+            self.projects_tree.selection_set(item)
+        except Exception as e:
+            print(f"Error scrolling to item: {e}")
 
 
 
-    def on_search_change(self, *args): 
-        if self.project_search_entry.get() != self.placeholder_text:
-            self.filter_projects_tree()
+
+    def reattach_all_items(self, item):
+        """Recursively reattach all items to make them visible."""
+        self.projects_tree.reattach(item, '', 'end')
+        for child in self.projects_tree.get_children(item):
+            self.reattach_all_items(child)
+
+
 
 
     def open_project(self):
         """Open the selected .blend file using the default application."""
         selected_item = self.projects_tree.focus()
         if selected_item:
-            project_name = self.projects_tree.item(selected_item)['values'][0]
-
-            config_file_path = os.path.join(os.path.expanduser("~"), ".BlenderManager","paths", "project_directory.json")
-            try:
-                with open(config_file_path, 'r') as config_file:
-                    config_data = json.load(config_file)
-                    project_directory = config_data.get('project_directory')
-
-                    if not project_directory or not os.path.isdir(project_directory):
-                        print("Project directory not found or invalid.")
-                        return
-
-                    project_path = os.path.join(project_directory, project_name)
-
-                    if project_path.endswith(('.blend', '.blend1', '.blend2', '.blend3')):
-                        try:
-                            os.startfile(project_path)
-                        except Exception as e:
-                            messagebox.showerror("Error", f"Failed to open project: {e}")
-                    else:
-                        messagebox.showwarning("Warning", "The selected project is not a .blend file.")
-            except FileNotFoundError:
-                messagebox.showerror("Error", "Project configuration file not found. Please set the project directory.")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to load project directory from configuration: {e}")
-
-
-
-    def filter_projects_tree(self):
-        """Filters the project Treeview based on the search query."""
-        query = self.project_search_var.get().lower()
-        self.projects_tree.delete(*self.projects_tree.get_children())
-
-        project_dir = self.project_directory_path.get()
-        if not os.path.exists(project_dir):
-            return
-
-        for item in os.listdir(project_dir):
-            if query in item.lower():
-                item_path = os.path.join(project_dir, item)
-                last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(item_path)))
-                size = os.path.getsize(item_path) / (1024 * 1024)
-                blender_version = self.get_blend_version(item_path) if item_path.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')) else "N/A"
-            
-                self.projects_tree.insert('', 'end', values=(item, last_modified, f"{size:.2f} MB", blender_version))
-
+            project_path = self.get_item_full_path(selected_item)
+            if os.path.isfile(project_path) and project_path.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
+                try:
+                    os.startfile(project_path)
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to open project: {e}")
+            else:
+                messagebox.showwarning("Warning", "The selected item is not a .blend file.")
+        else:
+            messagebox.showwarning("Warning", "No project selected.")
 
 
 
@@ -4215,12 +4536,12 @@ For further details, please refer to the user manual or visit our support site."
         file_path = event.data.strip().strip("{}")
         print("Dragged file path:", file_path)
 
-        if file_path.lower().endswith(('.blend', '.blend1', '.blend11')):
+        if os.path.isfile(file_path) and file_path.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
             print("Detected a .blend file directly.")
             self.add_project(file_path)
         elif os.path.isdir(file_path):
             print("Detected a directory.")
-            if any(file.lower().endswith(('.blend', '.blend1', '.blend11')) for root, dirs, files in os.walk(file_path) for file in files):
+            if any(file.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')) for root, dirs, files in os.walk(file_path) for file in files):
                 user_choice = messagebox.askyesno("Copy Options", "Do you want to copy the .blend files individually, or keep the folder structure?\n\nYes: Individually\nNo: Keep folder structure")
                 self.add_project(file_path, copy_individually=user_choice)
             else:
@@ -4228,7 +4549,7 @@ For further details, please refer to the user manual or visit our support site."
         elif file_path.lower().endswith('.zip'):
             print("Detected a zip file.")
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                if any(file.lower().endswith(('.blend', '.blend1', '.blend11')) for file in zip_ref.namelist()):
+                if any(file.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')) for file in zip_ref.namelist()):
                     user_choice = messagebox.askyesno("Extraction Options", "Do you want to extract .blend files individually, or keep them inside a folder?\n\nYes: Individually\nNo: Keep in folder")
                     self.add_project(file_path, extract_individually=user_choice)
                 else:
@@ -4240,12 +4561,12 @@ For further details, please refer to the user manual or visit our support site."
         if project_dir is None:
             project_dir = tk.filedialog.askdirectory()
             if not project_dir:
-                return  
+                return
 
         try:
             destination = self.project_directory_path.get()
 
-            if os.path.isfile(project_dir) and project_dir.lower().endswith(('.blend', '.blend1', '.blend11')):
+            if os.path.isfile(project_dir) and project_dir.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
                 shutil.copy(project_dir, destination)
                 print(f"Copied .blend file to {destination}")
 
@@ -4275,7 +4596,7 @@ For further details, please refer to the user manual or visit our support site."
 
             messagebox.showinfo("Success", "Project added successfully!")
             self.refresh_projects_list()
-        
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to add project: {e}")
 
@@ -4311,25 +4632,23 @@ For further details, please refer to the user manual or visit our support site."
         """Remove the selected project from the project directory."""
         selected_item = self.projects_tree.focus()
         if selected_item:
-            project_name = self.projects_tree.item(selected_item)['values'][0]
-            project_path = os.path.join(self.project_directory_path.get(), project_name)
-
+            project_path = self.get_item_full_path(selected_item)
             if os.path.exists(project_path):
-                confirm = messagebox.askyesno("Confirm", f"Are you sure you want to remove the project '{project_name}'?")
+                confirm = messagebox.askyesno("Confirm", f"Are you sure you want to remove '{project_path}'?")
                 if confirm:
                     try:
-                        
                         if os.path.isdir(project_path):
                             shutil.rmtree(project_path)
                         else:
-                           
                             os.remove(project_path)
-                        messagebox.showinfo("Success", f"Project '{project_name}' removed.")
+                        messagebox.showinfo("Success", f"'{project_path}' removed.")
                         self.refresh_projects_list()
                     except Exception as e:
                         messagebox.showerror("Error", f"Failed to remove project: {e}")
             else:
-                messagebox.showwarning("Warning", "The selected project does not exist.")
+                messagebox.showwarning("Warning", "The selected item does not exist.")
+        else:
+            messagebox.showwarning("Warning", "No item selected.")
 
 
     
@@ -4363,11 +4682,8 @@ For further details, please refer to the user manual or visit our support site."
         """Show the properties of the selected project file."""
         selected_item = self.projects_tree.focus()
         if selected_item:
-            project_name = self.projects_tree.item(selected_item)['values'][0]
-            project_path = os.path.join(self.project_directory_path.get(), project_name)
-
+            project_path = self.get_item_full_path(selected_item)
             if os.path.exists(project_path):
-                # Get file properties
                 try:
                     stats = os.stat(project_path)
                     size = stats.st_size
@@ -4379,18 +4695,13 @@ For further details, please refer to the user manual or visit our support site."
                     owner_uid = stats.st_uid
                     group_gid = stats.st_gid
 
-                    # Time Spent bilgisi (dosya adıyla eşleştirme)
                     time_spent = 'Unknown'
                     json_path = os.path.expanduser(r'~\.BlenderManager\mngaddon\project_time.json')
                     if os.path.exists(json_path):
                         try:
                             with open(json_path, 'r', encoding='utf-8') as json_file:
                                 time_data = json.load(json_file)
-
-                            # Dosya adını al (tam dosya yolu yerine)
                             project_basename = os.path.basename(project_path)
-
-                            # Zaman kaydını bulmaya çalış
                             for file_path, time_in_seconds in time_data.items():
                                 if os.path.basename(file_path) == project_basename:
                                     hours, remainder = divmod(time_in_seconds, 3600)
@@ -4400,7 +4711,7 @@ For further details, please refer to the user manual or visit our support site."
                         except Exception as e:
                             time_spent = f"Error reading time data: {e}"
 
-                    properties = f"Name: {project_name}\n"
+                    properties = f"Name: {os.path.basename(project_path)}\n"
                     properties += f"Path: {project_path}\n"
                     properties += f"Type: {'Folder' if is_dir else 'File'}\n"
                     properties += f"Size: {size} bytes\n"
@@ -4412,9 +4723,8 @@ For further details, please refer to the user manual or visit our support site."
                     properties += f"Group GID: {group_gid}\n"
                     properties += f"Time Spent: {time_spent}\n"
 
-                    # Display the properties in a new window
                     content_window = tk.Toplevel(self)
-                    content_window.title(f"Properties of {project_name}")
+                    content_window.title(f"Properties of {os.path.basename(project_path)}")
                     text_widget = tk.Text(content_window, wrap='word')
                     text_widget.insert('1.0', properties)
                     text_widget.pack(expand=1, fill='both')
@@ -4448,59 +4758,35 @@ For further details, please refer to the user manual or visit our support site."
             messagebox.showerror("Error", f"Failed to save project directory: {e}")
 
 
-    def refresh_projects_list(self):
-        """List all projects and their contents from the selected project directory."""
-        self.projects_tree.delete(*self.projects_tree.get_children())
-
-        project_dir = self.project_directory_path.get()
-        if not os.path.exists(project_dir):
-            return
-
-        for item in os.listdir(project_dir):
-            item_path = os.path.join(project_dir, item)
-            last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(item_path)))
-            size = os.path.getsize(item_path) / (1024 * 1024)
-            blender_version = self.get_blend_version(item_path) if item_path.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')) else "N/A"
-        
-            self.projects_tree.insert('', 'end', values=(item, last_modified, f"{size:.2f} MB", blender_version))
 
 
 
-    def insert_directory(self, parent, path):
-        """Add directories and files within a folder to the Treeview."""
-        for item in os.listdir(path):
-            item_path = os.path.join(path, item)
-            if os.path.isdir(item_path):
-                folder_id = self.projects_tree.insert(parent, 'end', values=(item, "", "Folder"), open=False)
-                self.projects_tree.insert(folder_id, 'end', text="dummy")  
-            else:
-                last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(item_path)))
-                size = os.path.getsize(item_path) / (1024 * 1024) 
-                self.projects_tree.insert(parent, 'end', values=(item, last_modified, f"{size:.2f} MB"), tags=("small",))
+    def load_folder_into_tree(self, folder_path, parent_item):
+        try:
+            items = sorted(os.listdir(folder_path))
+            for item in items:
+                item_path = os.path.join(folder_path, item)
 
+                if os.path.isdir(item_path):
+                    folder_id = self.projects_tree.insert(parent_item, 'end', text=item, values=("", "", ""), open=False)
+                    self.projects_tree.insert(folder_id, 'end', text="dummy") 
+
+                elif item.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
+                    last_modified = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(item_path)))
+                    size = os.path.getsize(item_path) / (1024 * 1024)
+                    blender_version = self.get_blend_version(item_path)
+                    self.projects_tree.insert(parent_item, 'end', text=item, values=(last_modified, f"{size:.2f} MB", blender_version))
+        except Exception as e:
+            print(f"Error loading folder into TreeView: {e}")
 
     def on_treeview_open(self, event):
-        """Handle the opening of a folder in the Treeview."""
         item_id = self.projects_tree.focus()
-        folder_path = self.get_folder_path_from_item(item_id)
-
         children = self.projects_tree.get_children(item_id)
-        if len(children) == 1 and self.projects_tree.item(children[0], "text") == "dummy":
-            self.projects_tree.delete(children[0])
 
-            self.insert_directory(item_id, folder_path)
-
-
-    def get_folder_path_from_item(self, item_id):
-        """Construct the full folder path based on the Treeview item."""
-        parts = []
-        while item_id:
-            item_text = self.projects_tree.item(item_id, "values")[0]
-            parts.append(item_text)
-            item_id = self.projects_tree.parent(item_id)
-        parts.reverse()
-        return os.path.join(self.project_directory_path.get(), *parts)
-    
+        if len(children) == 1 and self.projects_tree.item(children[0], 'text') == "dummy":
+            self.projects_tree.delete(children[0])  
+            folder_path = self.get_item_full_path(item_id)
+            self.load_folder_into_tree(folder_path, item_id)
 
 
 
@@ -5078,7 +5364,6 @@ For further details, please refer to the user manual or visit our support site."
 
         base_url = "https://download.blender.org/release/"
 
-        # SSL context oluştur
         ssl_context = ssl.create_default_context(cafile=certifi.where())
 
         try:
@@ -5141,13 +5426,12 @@ For further details, please refer to the user manual or visit our support site."
                 dates = {}
 
                 for line in lines:
-                    # Satırda hem dosya adı hem de tarih bilgisi olmalı
                     parts = line.split()
                     if len(parts) < 3:
                         continue
 
                     file_name = parts[0]
-                    date_str = " ".join(parts[1:3])  # Örneğin: "11-Sep-2017 13:19"
+                    date_str = " ".join(parts[1:3])  
 
                     if file_name.endswith(".sha256") or file_name.endswith(".md5"):
                         continue
@@ -5241,7 +5525,6 @@ For further details, please refer to the user manual or visit our support site."
             links = {}
             dates = {}
 
-            # Unstable versiyonları listeleyen build elemanlarını çek
             builds = soup.select(f'div.builds-list-container[data-platform="{platform}"] li.t-row.build')
 
             if not builds:
@@ -5250,7 +5533,6 @@ For further details, please refer to the user manual or visit our support site."
                 messagebox.showerror("Error", "No versions found. The site structure may have changed.")
                 return
 
-            # Versiyon, link ve tarih bilgilerini çek
             for build in builds:
                 classes = build.get("class", [])
                 if architecture and architecture not in classes:
@@ -5259,14 +5541,12 @@ For further details, please refer to the user manual or visit our support site."
                 version_element = build.select_one(".t-cell.b-version")
                 download_element = build.select_one(".t-cell.b-down a")
 
-                # Varsayılan tarih bilgisi
                 release_date = "Unknown Date"
 
                 if version_element and download_element:
                     version = version_element.text.strip()
                     download_link = download_element["href"]
 
-                    # SHA dosyalarını filtrele
                     if download_link.endswith(".sha256"):
                         download_link = download_link.replace(".sha256", "")
 
@@ -5282,7 +5562,6 @@ For further details, please refer to the user manual or visit our support site."
                 messagebox.showerror("Error", "No versions found.")
                 return
 
-            # TreeView'i güncelle, tarih bilgisi "Unknown Date" olarak varsayılan ayarlanmış durumda
             self.queue.put(('UPDATE_TREEVIEW', versions, links, dates))
             self.get_unstable_btn.config(text="Get Unstable Versions", state='normal')
             print("Versions successfully fetched and listed.")
@@ -5513,12 +5792,10 @@ For further details, please refer to the user manual or visit our support site."
                         except (IndexError, ValueError):
                             return [0]
 
-                    # Sürüm numaralarını büyükten küçüğe doğru sıralama
                     sorted_versions = sorted(versions, key=parse_version, reverse=True)
 
                     self.tree.delete(*self.tree.get_children())
                     for version in sorted_versions:
-                        # Dosya adına göre tarih bilgisini al
                         release_date = dates.get(version, "Unknown Date")
                         self.tree.insert("", "end", values=(version, release_date))
                         self.download_links[version] = links[version]
