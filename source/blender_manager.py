@@ -43,8 +43,10 @@ print(f"imports loaded in {end_time - start_time}.")
 CONFIG_FILE_PATH = os.path.join(os.path.expanduser("~"), ".BlenderManager", "config.json")
 
 DEFAULT_SETTINGS = {
+    "version": "0.0.4",
     "selected_theme": "darkly",
     "auto_update_checkbox": True,
+    "bm_auto_update_checkbox": True,
     "launch_on_startup":False,
     "run_in_background": True,
     "chunk_size_multiplier": 3,
@@ -198,6 +200,252 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
 
 
+#------------------------UPDATE CONTROL-----------------------------------------------
+    def bm_show_loading_screen(self):
+        """Show a loading screen during the update process."""
+        self.loading_window = tk.Toplevel(self)
+        self.loading_window.title("Updating Blender Manager")
+        self.loading_window.geometry("300x150")
+        self.loading_window.resizable(False, False)
+
+        self.loading_window.protocol("WM_DELETE_WINDOW", lambda: None)
+
+        self.update_idletasks() 
+        main_x = self.winfo_x()
+        main_y = self.winfo_y()
+        main_width = self.winfo_width()
+        main_height = self.winfo_height()
+
+        x = main_x + (main_width // 2) - (300 // 2)
+        y = main_y + (main_height // 2) - (150 // 2)
+
+        self.loading_window.geometry(f"+{x}+{y}")
+        self.loading_window.transient(self)
+        self.loading_window.grab_set()
+
+        ttkb.Label(
+            self.loading_window,
+            text="Downloading and Installing Update...\nPlease wait.",
+            font=("Segoe UI", 12),
+            anchor="center"
+        ).pack(pady=20)
+
+        self.loading_progress_var = tk.DoubleVar()
+        self.loading_progress_bar = ttkb.Progressbar(
+            self.loading_window,
+            variable=self.loading_progress_var,
+            maximum=100,
+            bootstyle="primary-striped"
+        )
+        self.loading_progress_bar.pack(fill='x', padx=20, pady=10)
+
+        self.loading_window.update_idletasks()
+
+
+    def bm_close_loading_screen(self):
+        """Close the loading screen after the update is complete."""
+        if hasattr(self, 'loading_window') and self.loading_window:
+            self.loading_window.destroy()
+            self.loading_window = None
+
+
+    def bm_check_for_updates_threaded(self):
+        """Start the update check in a separate thread to prevent GUI freezing."""
+        update_thread = threading.Thread(target=self.bm_check_for_updates, daemon=True)
+        update_thread.start()
+        
+    def bm_check_for_updates(self):
+        """Check for updates and prompt the user if a new version is available."""
+        self.bm_load_current_version()
+        print(f"Current version: {self.current_version}")
+
+        self.latest_version = self.bm_get_latest_version()
+        print(f"Latest version from GitHub: {self.latest_version}")
+
+        if self.latest_version and self.bm_is_new_version(self.current_version, self.latest_version):
+            response = messagebox.askyesno(
+                "New Version Available",
+                f"A new version {self.latest_version} is available. You are currently using {self.current_version}.\nDo you want to update?"
+            )
+            if response:
+                self.bm_download_and_install_update(self.latest_version)
+        else:
+            print(f"You are using the latest version: {self.current_version}")
+
+
+
+    def bm_load_current_version(self):
+        """Load the current version from DEFAULT_SETTINGS."""
+        self.current_version = DEFAULT_SETTINGS['version']
+        print(f"Loaded current version: {self.current_version}")
+    def update_version_in_config(self):
+        """Update the version in the config file based on DEFAULT_SETTINGS."""
+        if self.settings.get("version") != DEFAULT_SETTINGS['version']:
+            self.settings["version"] = DEFAULT_SETTINGS['version']
+            save_config(self.settings)
+            print(f"Config version updated to: {DEFAULT_SETTINGS['version']}")
+
+
+
+    def bm_get_latest_version(self):
+        """Fetch the latest version from GitHub releases."""
+        url = "https://github.com/verlorengest/BlenderManager/releases"
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            versions = re.findall(r'v(\d+\.\d+\.\d+)', response.text)
+            versions = sorted(versions, key=lambda x: list(map(int, x.split('.'))))
+            return versions[-1]
+        except Exception as e:
+            print(f"Error checking latest version: {e}")
+            return None
+
+    def bm_is_new_version(self, current_version, latest_version):
+        """Check if the latest version is newer than the current version."""
+        try:
+            current = list(map(int, current_version.split('.')))
+            latest = list(map(int, latest_version.split('.')))
+            return latest > current
+        except Exception as e:
+            print(f"Error comparing versions: {e}")
+            return False
+
+    def bm_hide_main_window(self):
+        """Hide the main Blender Manager window."""
+        self.withdraw()
+        
+    def bm_download_and_install_update(self, version):
+        """Download and install the new version of Blender Manager with feedback."""
+        import platform
+
+        download_url = f"https://github.com/verlorengest/BlenderManager/releases/download/v{version}/blender_manager_v{version}.zip"
+        temp_dir = tempfile.mkdtemp()
+        zip_path = os.path.join(temp_dir, "update.zip")
+
+        try:
+            self.bm_show_loading_screen()
+
+            response = requests.get(download_url, stream=True)
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded_size = 0
+
+            with open(zip_path, 'wb') as file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        file.write(chunk)
+                        downloaded_size += len(chunk)
+                        progress = (downloaded_size / total_size) * 100
+                        self.loading_progress_var.set(progress)
+                        self.loading_window.update_idletasks()
+
+            extract_dir = os.path.join(temp_dir, "extracted")
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+
+            current_os = platform.system().lower()
+
+            if current_os == 'windows':
+                script_path = self.create_windows_update_script(extract_dir)
+            elif current_os == 'darwin':  # macOS
+                script_path = self.create_macos_update_script(extract_dir)
+            elif current_os == 'linux':
+                script_path = self.create_linux_update_script(extract_dir)
+            else:
+                messagebox.showerror("Update Error", "Unsupported operating system.")
+                self.bm_close_loading_screen()
+                return
+
+            messagebox.showinfo("Update", "Blender Manager will now close for the update.")
+            self.bm_close_loading_screen()
+            subprocess.Popen([script_path], shell=True)
+            os._exit(0)
+
+        except Exception as e:
+            self.bm_close_loading_screen()
+            messagebox.showerror("Update Error", f"Failed to install update: {e}")
+        finally:
+            shutil.rmtree(temp_dir)
+
+
+
+    def create_windows_update_script(self, extract_dir):
+        """Windows için güncellenmiş update script fonksiyonu."""
+        script_path = os.path.join(extract_dir, "update.bat")
+        executable_path = os.path.join(os.getcwd(), "blender_manager.exe")
+
+        inner_dirs = [d for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
+        if not inner_dirs:
+            raise Exception("No inner directory found in the extracted update zip.")
+
+        inner_folder_path = os.path.join(extract_dir, inner_dirs[0])
+
+        with open(script_path, 'w') as script_file:
+            script_file.write(f"""
+timeout /t 2 /nobreak > nul
+xcopy /s /e /y "{inner_folder_path}\\*" "{os.path.dirname(executable_path)}"
+start "" "{executable_path}"
+del /q /s "{extract_dir}\\*"
+rmdir /s /q "{extract_dir}"
+exit
+            """)
+
+        return script_path
+
+
+    def create_macos_update_script(self, extract_dir):
+        """macOS için güncellenmiş update script fonksiyonu."""
+        script_path = os.path.join(extract_dir, "update_installer.sh")
+        executable_path = os.path.join(os.getcwd(), "blender_manager")
+
+        inner_dirs = [d for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
+        if not inner_dirs:
+            raise Exception("No inner directory found in the extracted update zip.")
+
+        inner_folder_path = os.path.join(extract_dir, inner_dirs[0])
+
+        with open(script_path, 'w') as script_file:
+            script_file.write(f"""
+#!/bin/bash
+sleep 2
+cp -r "{inner_folder_path}/"* "{os.getcwd()}/"
+open "{executable_path}"
+exit 0
+            """)
+
+        os.chmod(script_path, 0o755)
+        return script_path
+
+
+
+    def create_linux_update_script(self, extract_dir):
+        """Linux için güncellenmiş update script fonksiyonu."""
+        script_path = os.path.join(extract_dir, "update_installer.sh")
+        executable_path = os.path.join(os.getcwd(), "blender_manager")
+
+        inner_dirs = [d for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
+        if not inner_dirs:
+            raise Exception("No inner directory found in the extracted update zip.")
+
+        inner_folder_path = os.path.join(extract_dir, inner_dirs[0])
+
+        with open(script_path, 'w') as script_file:
+            script_file.write(f"""
+#!/bin/bash
+sleep 2
+cp -r "{inner_folder_path}/"* "{os.getcwd()}/"
+xdg-open "{executable_path}"
+exit 0
+            """)
+
+        os.chmod(script_path, 0o755)
+        return script_path
+
+
+#--------------------------------------------------------------------------------------------------
+
+
+
+
     def initialize_app(self):
         """Initializing the application."""
         print("Initializing app...")
@@ -205,18 +453,15 @@ class BlenderManagerApp(TkinterDnD.Tk):
         def background_task():
             """Runs heavy initialization tasks in a background thread."""
             try:
-                # setup file paths
                 setup_complete_file = os.path.join(os.path.expanduser("~"), ".BlenderManager", "setup_complete")
                 if os.path.exists(setup_complete_file):
                     print("Setup already complete. Skipping initialization.")
                     return  
 
-                # base directory
                 base_dir = BLENDER_MANAGER_DIR
                 if not os.path.exists(base_dir):
                     os.makedirs(base_dir)
 
-                # create required directories
                 required_dirs = [
                     "BaseMeshes", "BlenderVersions", "mngaddon",
                     "paths", "Projects", "renders"
@@ -226,7 +471,6 @@ class BlenderManagerApp(TkinterDnD.Tk):
                     if not os.path.exists(dir_path):
                         os.makedirs(dir_path)
 
-                # create required JSON files
                 paths_dir = os.path.join(base_dir, "paths")
                 json_files = [
                     "base_mesh_path.json",
@@ -238,18 +482,15 @@ class BlenderManagerApp(TkinterDnD.Tk):
                     file_path = os.path.join(paths_dir, json_file)
                     if not os.path.exists(file_path):
                         with open(file_path, 'w') as file:
-                            json.dump({}, file)  # Write an empty JSON object
+                            json.dump({}, file) 
 
-                # mark setup as complete
                 with open(setup_complete_file, 'w') as file:
                     file.write("Setup complete.")
             finally:
                 print("Initialization complete.")
-                # schedule UI updates on the main thread
                 self.after(0, self.show_window)
                 self.after(0, self.deiconify)
 
-        # start the background task in a separate thread
         threading.Thread(target=background_task, daemon=True).start()
 
 
@@ -267,8 +508,8 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
     def load_settings_on_begining(self):
         self.settings = load_config()
-
-        
+        self.bm_load_current_version()
+        self.update_version_in_config()
         selected_theme = self.settings.get("selected_theme", "darkly")
         self.style = ttkb.Style()
         if selected_theme in self.style.theme_names():
@@ -279,7 +520,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
             self.settings["selected_theme"] = "darkly"
             save_config(self.settings)
             print("Invalid theme. Default theme 'darkly' applied.")
-
+            
         # load data
         self.selected_theme = tk.StringVar(value=self.settings.get("selected_theme", "darkly"))
         self.auto_update_var = tk.BooleanVar(value=self.settings.get("auto_update_checkbox", True))
@@ -295,6 +536,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.button_font_size = self.settings.get("button_font_size", 14)
 
         self.apply_custom_styles()
+
 
 
 
@@ -339,6 +581,12 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.create_logs_tab()
         self.create_main_menu()
         
+        self.current_version = self.bm_load_current_version()
+        self.latest_version = None
+        if DEFAULT_SETTINGS.get("auto_update_checkbox", True):
+            print("Checking Blender Manager updates...")
+            self.bm_check_for_updates_threaded()
+            
 
         if self.auto_update_var.get():
             print(f"Auto Update: {self.auto_update_var.get()}")
@@ -1117,10 +1365,10 @@ class BlenderManagerApp(TkinterDnD.Tk):
         )
         self.recent_projects_tree.heading("Project Name", text="Project Name")
         self.recent_projects_tree.heading("Last Opened", text="Last Opened")
-        self.recent_projects_tree.heading("Path", text="Path")  # Hidden column for project path
+        self.recent_projects_tree.heading("Path", text="Path")  
         self.recent_projects_tree.column("Project Name", anchor="w", width=300, minwidth=200, stretch=True)
         self.recent_projects_tree.column("Last Opened", anchor="center", width=150, minwidth=100, stretch=False)
-        self.recent_projects_tree.column("Path", width=0, stretch=False)  # Hide the path column
+        self.recent_projects_tree.column("Path", width=0, stretch=False) 
         self.recent_projects_tree.grid(row=0, column=0, sticky="nsew")
 
         self.recent_projects_tree.bind("<<TreeviewSelect>>", self.update_work_hours_label)
@@ -1146,10 +1394,42 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
         self.recent_projects_tree.bind("<Double-1>", self.on_project_double_click)
 
+        # --- Blender Manager Version Label ---
+        self.bm_version_label = ttkb.Label(
+            self.main_menu_frame,
+            text=f"Blender Manager Version: {DEFAULT_SETTINGS['version']}",
+            style='Custom.Large.TLabel',
+            font=(self.button_font_family, 8)  
+        )
+        self.bm_version_label.grid(row=10, column=0, sticky="sw", padx=(10, 0), pady=(0, 5))
+        self.update_bm_version_label()
 
+    def update_bm_version_label(self):
+        """Update the Blender Manager version label based on the current and latest versions."""
+        current_version = self.settings.get("version", "0.0.0")
+        latest_version = self.bm_get_latest_version()
 
-
-
+        version_text = f"Blender Manager Version: {current_version}"
+    
+        if latest_version and self.bm_is_new_version(current_version, latest_version):
+            version_text += " ⚠️"
+            self.bm_version_label.config(
+                text=version_text,
+                foreground="orange",
+                cursor="hand2",
+                font=(self.button_font_family, 8, "underline")
+            )
+            self.bm_version_label.bind("<Button-1>", self.on_version_label_click)
+        else:
+            self.bm_version_label.config(
+                text=version_text,
+                foreground="green",
+                cursor="arrow",
+                font=(self.button_font_family, 8)
+            )
+            self.bm_version_label.unbind("<Button-1>")
+    def on_version_label_click(self, event):
+        self.bm_check_for_updates_threaded()
 
     # -------- Create Project Menu -----------
 
@@ -2380,19 +2660,19 @@ For further details, please refer to the user manual or visit our support site."
             for filename in os.listdir(self.blender_install_dir):
                 if filename.lower().startswith("release") and filename.endswith(".txt"):
                     release_file_path = os.path.join(self.blender_install_dir, filename)
-                    print(f"Checking release file: {release_file_path}")  # Debug line
+                    print(f"Checking release file: {release_file_path}")  
 
                     with open(release_file_path, 'r', encoding='utf-8') as file:
                         for line in file:
-                            print(f"Reading line: {line.strip()}")  # Debug line
+                            print(f"Reading line: {line.strip()}")  
                             version_match = re.search(r'Blender (\d+\.\d+(?:\.\d+)?)', line)
                             if version_match:
-                                print(f"Version found in file: {version_match.group(1)}")  # Debug line
+                                print(f"Version found in file: {version_match.group(1)}")  
                                 return version_match.group(1)  # Returns version in format X.Y or X.Y.Z
         except Exception as e:
             print(f"Failed to get Blender version from release files: {e}")
     
-        print("No version information found.")  # Debug line
+        print("No version information found.")  
         return None
 
 
@@ -3087,7 +3367,7 @@ For further details, please refer to the user manual or visit our support site."
 
         def show_loading_bar():
             self.loading_bar = tk.Label(self.main_menu_frame, text="Loading...", font=("Segoe UI", 10))
-            self.loading_bar.grid(row=3, column=0, pady=10)  # Use grid instead of pack
+            self.loading_bar.grid(row=3, column=0, pady=10)  
 
         def hide_loading_bar():
             if hasattr(self, 'loading_bar'):
@@ -3120,7 +3400,6 @@ For further details, please refer to the user manual or visit our support site."
                 blender_manager_dir = BLENDER_MANAGER_DIR
 
                 if os.path.exists(blender_manager_dir):
-                    # Hide the main window before deletion
                     self.withdraw()
 
                     shutil.rmtree(blender_manager_dir)
@@ -3401,7 +3680,6 @@ For further details, please refer to the user manual or visit our support site."
         plugins_frame = ttk.Frame(self.plugins_tab, padding=(10, 10, 10, 10))
         plugins_frame.pack(expand=1, fill='both')
 
-        # Directory Selector Frame
         directory_frame = ttk.Frame(plugins_frame)
         directory_frame.pack(fill='x', padx=10, pady=(0, 5))
 
@@ -3409,7 +3687,6 @@ For further details, please refer to the user manual or visit our support site."
         self.directory_entry = ttk.Entry(directory_frame, textvariable=self.directory_path, width=50)
         self.directory_entry.grid(row=0, column=0, padx=(0, 5), sticky='w')
 
-        # Browse Button
         self.browse_button = ttk.Button(
             directory_frame,
             text="Browse",
@@ -3419,7 +3696,6 @@ For further details, please refer to the user manual or visit our support site."
         )
         self.browse_button.grid(row=0, column=1, padx=(0, 5), sticky='w')
 
-        # Go to File Path Button
         self.go_to_button = ttk.Button(
             directory_frame,
             text="Go to File Path",
@@ -3464,18 +3740,15 @@ For further details, please refer to the user manual or visit our support site."
         self.plugin_search_entry.insert(0, self.plugin_placeholder_text)
         self.plugin_search_entry.configure(foreground="grey")
 
-        # Binding events for placeholder behavior
         self.plugin_search_entry.bind("<FocusIn>", self.on_plugin_entry_click)
         self.plugin_search_entry.bind("<FocusOut>", self.on_plugin_focus_out)
 
 
 
 
-        # Buttons Frame on the left
         buttons_frame = ttk.Frame(plugins_frame)
         buttons_frame.pack(side='left', padx=(10, 10), fill='y')
 
-        # Add Plugin Button
         self.add_plugin_button = ttk.Button(
             buttons_frame,
             text="Add",
@@ -3486,7 +3759,6 @@ For further details, please refer to the user manual or visit our support site."
         )
         self.add_plugin_button.pack(pady=(10, 10), fill='x')
 
-        # Remove Plugin Button
         self.remove_plugin_button = ttk.Button(
             buttons_frame,
             text="Remove",
@@ -3524,7 +3796,6 @@ For further details, please refer to the user manual or visit our support site."
         self.style.configure("PluginManagement.Treeview.Heading", font=('Segoe UI', 14, 'bold'))  
 
 
-        # Plugins Treeview on the right
         self.plugins_tree = ttk.Treeview(
             plugins_frame,
             columns=('Name', 'Version', 'Compatible'),
@@ -3540,16 +3811,13 @@ For further details, please refer to the user manual or visit our support site."
         self.plugins_tree.column('Compatible', width=150, anchor='center')
         self.plugins_tree.pack(side='right', fill='both', expand=1)
 
-        # Scrollbar for the Treeview
         scrollbar = ttk.Scrollbar(plugins_frame, orient="vertical", command=self.plugins_tree.yview)
         self.plugins_tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side='right', fill='y')
 
-        # Bind Drag-and-Drop events to the Treeview
         self.plugins_tree.drop_target_register(DND_FILES)
         self.plugins_tree.dnd_bind('<<Drop>>', self.handle_treeview_drop)
 
-        # Load initial plugin list
         self.refresh_plugins_list()
 
 
@@ -3579,7 +3847,6 @@ For further details, please refer to the user manual or visit our support site."
             print("No version selected.")
             return
 
-        # Update the plugin directory based on the selected version
         appdata_dir = os.getenv('APPDATA')
         self.directory_path.set(os.path.join(appdata_dir, "Blender Foundation", "Blender", selected_version, "scripts", "addons"))
         self.refresh_plugins_list()
@@ -3587,7 +3854,6 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
-    # Methods for handling plugin search placeholder
     def on_plugin_entry_click(self, event):
         if self.plugin_search_entry.get() == self.plugin_placeholder_text:
             self.plugin_search_entry.delete(0, "end")
@@ -4035,6 +4301,7 @@ For further details, please refer to the user manual or visit our support site."
         self.project_search_entry.bind("<FocusOut>", on_focus_out)
 
 
+
         style = ttkb.Style()
         self.style.configure("ProjectManagement.Treeview", font=('Segoe UI', 12), rowheight=30)
         self.style.configure("ProjectManagement.Treeview.Heading", font=('Segoe UI', 14, 'bold'))
@@ -4047,16 +4314,16 @@ For further details, please refer to the user manual or visit our support site."
             style='ProjectManagement.Treeview'
         )
 
-        self.projects_tree.heading('#0', text='Project Name')
+        self.projects_tree.heading('#0', text='Project Name', command=lambda: self.sort_tree_column('#0', False))
         self.projects_tree.column('#0', width=300, anchor='w')
 
-        self.projects_tree.heading('Last Modified', text='Last Modified')
+        self.projects_tree.heading('Last Modified', text='Last Modified', command=lambda: self.sort_tree_column('Last Modified', False))
         self.projects_tree.column('Last Modified', width=200, anchor='center')
 
-        self.projects_tree.heading('Size', text='Size')
+        self.projects_tree.heading('Size', text='Size', command=lambda: self.sort_tree_column('Size', False))
         self.projects_tree.column('Size', width=100, anchor='center')
 
-        self.projects_tree.heading('Last Blender Version', text='Blender Ver.')
+        self.projects_tree.heading('Last Blender Version', text='Blender Ver.', command=lambda: self.sort_tree_column('Last Blender Version', False))
         self.projects_tree.column('Last Blender Version', width=150, anchor='center')
 
         self.projects_tree.pack(side='right', fill='both', expand=1)
@@ -4064,6 +4331,7 @@ For further details, please refer to the user manual or visit our support site."
         scrollbar = ttk.Scrollbar(projects_frame, orient="vertical", command=self.projects_tree.yview)
         self.projects_tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side='right', fill='y')
+
         self.projects_tree.bind("<<TreeviewOpen>>", self.on_treeview_open)
         self.projects_tree.drop_target_register(DND_FILES)
         self.projects_tree.dnd_bind('<<Drop>>', self.handle_project_treeview_drop)
@@ -4078,10 +4346,60 @@ For further details, please refer to the user manual or visit our support site."
         self.move_menu = tk.Menu(self.context_menu, tearoff=0)
         self.context_menu.add_cascade(label="Move to Folder", menu=self.move_menu)
 
-        self.projects_tree.bind("<Button-3>", self.show_context_menu)
-
-
+        self.projects_tree.bind("<Button-3>", self.show_context_menu_projects)
         self.refresh_projects_list()
+
+
+    def sort_tree_column(self, column, reverse):
+        """Recursively sort TreeView items based on the specified column, with folders always on top."""
+        def is_folder(item):
+            """Check if the TreeView item is a folder."""
+            full_path = self.get_item_full_path(item)
+            return os.path.isdir(full_path)
+
+        def parse_version(version_str):
+            """Parse Blender version string, handling '+' correctly."""
+            try:
+                if '+' in version_str:
+                    cleaned_version = version_str.replace('+', '').strip()
+                    version_tuple = tuple(map(int, cleaned_version.split('.')))
+                    return (*version_tuple, 1)
+                else:
+                    version_tuple = tuple(map(int, version_str.split('.')))
+                    return (*version_tuple, 0)
+            except ValueError:
+                return (0, 0, 0)
+
+        def sort_items(parent_item):
+            """Sort items under a specific parent item."""
+            if column == '#0':  
+                items = [(self.projects_tree.item(item, 'text'), item) for item in self.projects_tree.get_children(parent_item)]
+            else:  
+                items = [(self.projects_tree.set(item, column), item) for item in self.projects_tree.get_children(parent_item)]
+
+            folders = [(text, item) for text, item in items if is_folder(item)]
+            files = [(text, item) for text, item in items if not is_folder(item)]
+
+            if column == 'Size':
+                files.sort(key=lambda x: float(x[0].replace(' MB', '')) if x[0] and ' MB' in x[0] else 0.0, reverse=reverse)
+            elif column == 'Last Modified':
+                files.sort(key=lambda x: x[0] if x[0] else '', reverse=reverse)
+            elif column == 'Last Blender Version':
+                files.sort(key=lambda x: parse_version(x[0]), reverse=reverse)
+            else:  
+                folders.sort(key=lambda x: x[0].lower(), reverse=reverse)
+                files.sort(key=lambda x: x[0].lower(), reverse=reverse)
+
+            sorted_items = folders + files
+            for index, (text, item) in enumerate(sorted_items):
+                self.projects_tree.move(item, parent_item, index)
+                sort_items(item)
+
+        sort_items('')
+        self.projects_tree.heading(column, command=lambda: self.sort_tree_column(column, not reverse))
+
+
+
 
 
 
@@ -4091,7 +4409,7 @@ For further details, please refer to the user manual or visit our support site."
         #-----------Functions----------#
         
 
-    def show_context_menu(self, event):
+    def show_context_menu_projects(self, event):
         """Show context menu on right-click."""
         selected_item = self.projects_tree.identify_row(event.y)
         if selected_item:
@@ -4116,35 +4434,93 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
+
+
     def populate_move_menu(self, menu):
-        """Populate the Move to Folder submenu with all folders, including subdirectories."""
+        """Initialize the Move to Folder menu with top-level folders only."""
         menu.delete(0, 'end')
         project_root = self.project_directory_path.get()
-        self.add_folders_to_move_menu(menu, project_root)
 
-    def add_folders_to_move_menu(self, menu, folder_path):
-        """Recursively add all folders (excluding .blend files) to the move menu."""
+        self.folder_list = []
+        self.current_index = 0
+
+        thread = threading.Thread(target=self.collect_folders_in_background, args=(project_root,))
+        thread.start()
+
+        self.after(100, lambda: self.load_folders_to_menu(menu))
+
+    def collect_folders_in_background(self, folder_path):
+        """Recursively collect all folders in the background."""
         try:
             items = sorted(os.listdir(folder_path))
             for item in items:
                 item_path = os.path.join(folder_path, item)
-
                 if os.path.isdir(item_path):
-                    submenu = tk.Menu(menu, tearoff=0)
+                    self.folder_list.append(item_path)
+                    self.collect_folders_in_background(item_path)
+        except Exception as e:
+            print(f"Error in collect_folders_in_background: {e}")
 
-                    menu.add_cascade(
-                        label=item,
-                        menu=submenu
-                    )
+    def load_folders_to_menu(self, menu, batch_size=10):
+        """Load folders into the menu in small batches to avoid freezing the GUI."""
+        if self.current_index >= len(self.folder_list):
+            return
 
-                    submenu.add_command(
+        end_index = min(self.current_index + batch_size, len(self.folder_list))
+
+        for folder_path in self.folder_list[self.current_index:end_index]:
+            folder_name = os.path.basename(folder_path)
+
+            submenu = tk.Menu(menu, tearoff=0)
+
+            submenu.add_command(
+                label="Select This Folder",
+                command=lambda path=folder_path: self.move_blend_file(self.get_item_full_path(self.projects_tree.focus()), path)
+            )
+
+            self.load_submenu(submenu, folder_path)
+
+            menu.add_cascade(
+                label=folder_name,
+                menu=submenu
+            )
+
+        self.current_index = end_index
+
+        if self.current_index < len(self.folder_list):
+            self.after(100, lambda: self.load_folders_to_menu(menu, batch_size))
+
+    def load_submenu(self, submenu, folder_path):
+        """Load subfolders dynamically into the submenu."""
+        try:
+            submenu.delete(0, 'end')
+        
+            submenu.add_command(
+                label="Select This Folder",
+                command=lambda path=folder_path: self.move_blend_file(self.get_item_full_path(self.projects_tree.focus()), path)
+            )
+
+            items = sorted(os.listdir(folder_path))
+            for item in items:
+                item_path = os.path.join(folder_path, item)
+                if os.path.isdir(item_path):
+                    nested_submenu = tk.Menu(submenu, tearoff=0)
+
+                    nested_submenu.add_command(
                         label="Select This Folder",
                         command=lambda path=item_path: self.move_blend_file(self.get_item_full_path(self.projects_tree.focus()), path)
                     )
 
-                    self.add_folders_to_move_menu(submenu, item_path)
+                    self.load_submenu(nested_submenu, item_path)
+
+                    submenu.add_cascade(
+                        label=os.path.basename(item_path),
+                        menu=nested_submenu
+                    )
         except Exception as e:
-            print(f"Error in add_folders_to_move_menu: {e}")
+            print(f"Error in load_submenu: {e}")
+
+
 
 
 
@@ -4175,8 +4551,7 @@ For further details, please refer to the user manual or visit our support site."
                     return
 
             shutil.move(source_path, target_path)
-            self.refresh_projects_list()
-            messagebox.showinfo("Success", f"Moved {os.path.basename(source_path)} to {target_folder}")
+            messagebox.showinfo("Success", f"Moved {os.path.basename(source_path)} to {target_folder}. Refresh list to see changes.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to move file: {e}")
 
@@ -4656,6 +5031,17 @@ elif '{export_format}' == 'abc':
         """Allow the user to select the directory where projects are stored."""
         directory = tk.filedialog.askdirectory()
         if directory:
+            total_files = sum([len(files) for _, _, files in os.walk(directory)])
+        
+            if total_files > 1000:  
+                proceed = messagebox.askyesno(
+                    "Large Directory Warning",
+                    f"The selected directory contains {total_files} files. Loading this directory may take a long time and could freeze the application.\n\n"
+                    "Do you want to continue?"
+                )
+                if not proceed:
+                    return
+
             self.project_directory_path.set(directory)
             self.save_project_directory(directory)
             self.refresh_projects_list()
@@ -5148,7 +5534,7 @@ elif '{export_format}' == 'abc':
 
 
     # -------------------------------------------------#
-    # --------------INSTALL VERSIONS TAB---------------#
+    # --------------INSTALLATION TAB-------------------#
     # -------------------------------------------------#
 
     def create_install_tab(self):
@@ -5263,21 +5649,82 @@ elif '{export_format}' == 'abc':
         )
         self.cancel_button.pack(fill='x', pady=(5, 10), padx=(0, 10))
         self.cancel_button.pack_forget()
-
+        
+        self.release_notes_btn = ttkb.Button(
+            left_frame,
+            text="Release Notes",
+            takefocus=False,
+            command=self.show_release_notes,
+            bootstyle="info"
+        )
+        self.release_notes_btn.pack(fill='x', pady=(5, 10), padx=(0, 10))
+        self.release_notes_btn.config(state='disabled')  
+        
         self.tree = ttkb.Treeview(right_frame, columns=("Version", "Release Date"), show="headings", height=20, style="Custom.Treeview")
         self.tree.heading("Version", text="Blender Version")
         self.tree.heading("Release Date", text="Release Date")
         self.tree.column("Version", anchor="center")
         self.tree.column("Release Date", anchor="center")
         self.tree.pack(expand=True, fill="both")
-        
+        self.tree.bind("<<TreeviewSelect>>", self.on_treeview_select_install_tab)
         self.download_links = {}
 
 
 
     # ----Functions----
     
+    def on_treeview_select_install_tab(self, event):
+        """TreeView'de bir öğe seçildiğinde Release Notes butonunu etkinleştir."""
+        selected_item = self.tree.focus()
+        if selected_item:
+            self.release_notes_btn.config(state='normal')
+        else:
+            self.release_notes_btn.config(state='disabled')
+
+
     
+
+    def show_release_notes(self):
+        import webview
+        from tkinter import Toplevel, messagebox
+        selected_item = self.tree.focus()
+        if not selected_item:
+            messagebox.showerror("Error", "No version selected.")
+            return
+
+        version_text = self.tree.item(selected_item, "values")[0]
+        version = version_text.replace("Blender", "").strip()
+        version_parts = version.split('.')
+
+        if len(version_parts) >= 2:
+            major_version = version_parts[0]
+            minor_version = version_parts[1]
+        
+            official_url = f"https://www.blender.org/download/releases/{major_version}.{minor_version}/"
+            alternative_url = f"https://developer.blender.org/docs/release_notes/{major_version}.{minor_version}/"
+
+            def check_url(url):
+                try:
+                    response = requests.head(url)
+                    return response.status_code == 200
+                except Exception as e:
+                    print(f"Error checking URL: {e}")
+                    return False
+
+            if check_url(official_url):
+                webview.create_window(f"Release Notes for Blender {major_version}.{minor_version}", official_url)
+                webview.start()
+            elif check_url(alternative_url):
+                webview.create_window(f"Release Notes for Blender {major_version}.{minor_version}", alternative_url)
+                webview.start()
+            else:
+                messagebox.showerror("Error", f"Release notes for Blender {major_version}.{minor_version} not found.")
+        else:
+            messagebox.showerror("Error", "Invalid version format.")
+        
+
+
+
 
     def cancel_installation(self):
         if not self.is_installing:
