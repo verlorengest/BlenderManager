@@ -2,8 +2,8 @@
 
 Blender Manager includes several powerful features designed to streamline project setup and tracking, all without the need to open Blender initially. Here’s a closer look at some of its standout functionalities:
 
-<details>
-<summary>**Features**</summary>
+
+#Features
 ### 1. **Project Time Tracking**
 Blender Manager automatically tracks the time spent on each project, giving users a clear view of their work hours. This feature is integrated directly into the **Recent Projects** section, where the total time spent on a project is displayed. Users can monitor their productivity and get a detailed breakdown of working hours for each project, making it an excellent tool for both personal time management and client billing.
 
