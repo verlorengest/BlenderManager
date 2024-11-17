@@ -103,10 +103,11 @@ The **Settings** tab in Blender Manager is designed to give users full control o
 
 ## Step 3: Setup the Addon
 
-1. Once the application is open, navigate to the **Settings** tab in the menu.
-2. Click on the **"Setup Addon"** button.
-   - The application will automatically install the addon in all detected Blender versions.
-3. Wait for the process to complete. You should see a confirmation message once the addon is installed.
+1. Make sure Blender is installed on your system. If not, please install Blender before proceeding.
+2. Open the application and navigate to the Settings tab in the menu.
+3. Click on the "Setup Addon" button.
+4. The application will automatically detect all installed Blender versions and install the addon.
+5. Wait for the process to complete. You should see a confirmation message once the addon is successfully installed.
 
 ## Step 4: Verify Installation
 
@@ -114,6 +115,7 @@ The **Settings** tab in Blender Manager is designed to give users full control o
 2. Go to **Edit** > **Preferences** > **Add-ons**.
 3. Search for **"Blender Manager"** in the search bar.
 4. Ensure that the addon is enabled (checkbox is checked).
+5. Restart Blender.
 
 
 ## You're All Set!
