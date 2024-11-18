@@ -1,8 +1,24 @@
 # Blender Manager
 
-![manager](https://github.com/user-attachments/assets/7f1728df-498a-4c75-b81f-96ba8ba268e2)
+![bmanager1](https://github.com/user-attachments/assets/8f9f6104-29c1-405b-b0f4-9516470f7231)
 
-Blender Manager includes several powerful features designed to streamline project setup and tracking, all without the need to open Blender initially. Here’s a closer look at some of its standout functionalities:
+
+**Blender Manager includes several powerful features designed to streamline project setup and tracking, all without the need to open Blender initially. Here’s a closer look at some of its standout functionalities:**
+
+
+<details>
+<summary>📋 <strong>Screenshots</strong></summary>
+![bmsc1](https://github.com/user-attachments/assets/2b12f8dd-0f75-4cbc-9e41-2e06c2e4d84f)
+![bmngsc8](https://github.com/user-attachments/assets/858fc794-03aa-4eb5-ad2a-1b7cf37e190d)
+![bmngsc9](https://github.com/user-attachments/assets/de9b55eb-8168-42fa-8e6b-e411814e5df4)
+![bmngsc2](https://github.com/user-attachments/assets/f7a2702f-5fc5-4342-9177-0732b2542ecf)
+![bmngsc3](https://github.com/user-attachments/assets/ac5dc13a-f6f0-4ef5-be29-7ee10942ed65)
+![bmngsc4](https://github.com/user-attachments/assets/6044471e-f884-4889-8bbc-8685516d2387)
+![bmngsc5](https://github.com/user-attachments/assets/3cbeb936-7237-4627-a2f5-aca87b28ba60)
+![bmngsc6](https://github.com/user-attachments/assets/dd77a7f1-e258-4784-9ae8-8adb5716a658)
+![bmngsc7](https://github.com/user-attachments/assets/26b5529a-b66a-4f06-bdf6-0dfd153ab3ae)
+
+</details>
 
 <details>
 <summary>📋 <strong>Features</strong></summary>
