@@ -137,6 +137,5 @@ Blender Manager is free and open-source. If you find it helpful, consider suppor
 - [**Donate on Gumroad**](https://verlorengest.gumroad.com/l/blendermanager)  
 - [**Buy Me a Coffee**](https://buymeacoffee.com/verlorengest) ☕
 
-Your support helps in maintaining and improving the project. Thank you!
 
 ---
