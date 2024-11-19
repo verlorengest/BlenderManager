@@ -155,6 +155,9 @@ Blender Manager is now installed and ready to enhance your Blender workflow. Enj
 
 </details>
 
+
+
+
 **⚠️ Note: This is a pre-release version.**
 
 This version may contain bugs and issues as it is still in pre-release. Your feedback is crucial in helping us improve the application. If you encounter any problems, please don’t hesitate to open an issue and let us know!
