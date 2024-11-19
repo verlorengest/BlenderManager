@@ -22,7 +22,6 @@ import zipfile
 import ast
 from bs4 import BeautifulSoup
 import threading
-from threading import Timer
 import queue 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -370,7 +369,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
 
     def create_windows_update_script(self, extract_dir):
-        """Windows için güncellenmiş update script fonksiyonu."""
+        """update function for Windows"""
         script_path = os.path.join(extract_dir, "update.bat")
         executable_path = os.path.join(os.getcwd(), "blender_manager.exe")
 
@@ -380,10 +379,21 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
         inner_folder_path = os.path.join(extract_dir, inner_dirs[0])
 
-        with open(script_path, 'w') as script_file:
+        with open(script_path, 'w', encoding='utf-8') as script_file:
             script_file.write(f"""
+@echo off
+chcp 65001 > nul
 timeout /t 2 /nobreak > nul
-xcopy /s /e /y "{inner_folder_path}\\*" "{os.path.dirname(executable_path)}"
+
+set "source={inner_folder_path}"
+set "destination={os.path.dirname(executable_path)}"
+
+xcopy /s /e /y "%source%\\*" "%destination%"
+if %errorlevel% neq 0 (
+    echo Update failed. Unable to copy files.
+    exit /b 1
+)
+
 start "" "{executable_path}"
 del /q /s "{extract_dir}\\*"
 rmdir /s /q "{extract_dir}"
@@ -394,7 +404,7 @@ exit
 
 
     def create_macos_update_script(self, extract_dir):
-        """macOS için güncellenmiş update script fonksiyonu."""
+        """update function for macOS"""
         script_path = os.path.join(extract_dir, "update_installer.sh")
         executable_path = os.path.join(os.getcwd(), "blender_manager")
 
@@ -419,7 +429,7 @@ exit 0
 
 
     def create_linux_update_script(self, extract_dir):
-        """Linux için güncellenmiş update script fonksiyonu."""
+        """update function for Linux"""
         script_path = os.path.join(extract_dir, "update_installer.sh")
         executable_path = os.path.join(os.getcwd(), "blender_manager")
 
