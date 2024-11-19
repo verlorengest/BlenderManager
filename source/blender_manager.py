@@ -22,6 +22,7 @@ import zipfile
 import ast
 from bs4 import BeautifulSoup
 import threading
+from threading import Timer
 import queue 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -43,7 +44,7 @@ print(f"imports loaded in {end_time - start_time}.")
 CONFIG_FILE_PATH = os.path.join(os.path.expanduser("~"), ".BlenderManager", "config.json")
 
 DEFAULT_SETTINGS = {
-    "version": "0.0.4",
+    "version": "0.0.5",
     "selected_theme": "darkly",
     "auto_update_checkbox": True,
     "bm_auto_update_checkbox": True,
@@ -556,44 +557,63 @@ exit 0
         main_frame = ttkb.Frame(self, padding=(20, 20, 20, 20))
         main_frame.pack(expand=1, fill='both')
         font_family = self.button_font_family
+
+        # Configure styles for dynamic scaling
         self.style.configure("TNotebook.Tab", font=(font_family, 10))
+
+        # Notebook
         self.notebook = ttkb.Notebook(main_frame)
         self.notebook.pack(expand=1, fill='both')
+
+        # Tabs
         self.main_menu_tab = ttk.Frame(self.notebook)
         self.installed_tab = ttkb.Frame(self.notebook)
         self.install_tab = ttkb.Frame(self.notebook)
-        self.logs_tab = ttkb.Frame(self.notebook)  # Logs tab
-        self.notebook.add(self.main_menu_tab, text="Main Menu")
-        self.notebook.add(self.installed_tab, text='Installed Versions')
-        self.notebook.add(self.install_tab, text='Installation')
+        self.logs_tab = ttkb.Frame(self.notebook)
         self.plugins_tab = ttkb.Frame(self.notebook)
-        self.notebook.add(self.plugins_tab, text='Addon Management')
-        self.create_plugins_tab()
         self.project_management_tab = ttkb.Frame(self.notebook)
-        self.notebook.add(self.project_management_tab, text='Project Management')
-        self.create_project_management_tab()
         self.render_management_tab = ttkb.Frame(self.notebook)
+
+        # Add tabs
+        self.notebook.add(self.main_menu_tab, text="Main Menu")
+        self.notebook.add(self.installed_tab, text='Version Management')
+        self.notebook.add(self.install_tab, text='Installation')
+        self.notebook.add(self.plugins_tab, text='Addon Management')
+        self.notebook.add(self.project_management_tab, text='Project Management')
         self.notebook.add(self.render_management_tab, text='Render Management')
+        self.notebook.add(self.logs_tab, text='Logs')
+
+        # Call tab-specific creation methods
+        self.create_plugins_tab()
+        self.create_project_management_tab()
         self.create_render_management_tab()
         self.create_installed_tab()
         self.create_install_tab()
-        self.notebook.add(self.logs_tab, text='Logs')  # Add logs tab
         self.create_logs_tab()
         self.create_main_menu()
-        
+
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+
+        main_frame.grid_rowconfigure(0, weight=1)
+        main_frame.grid_columnconfigure(0, weight=1)
+
+        # Check for updates
         self.current_version = self.bm_load_current_version()
         self.latest_version = None
         if DEFAULT_SETTINGS.get("auto_update_checkbox", True):
             print("Checking Blender Manager updates...")
             self.bm_check_for_updates_threaded()
-            
 
         if self.auto_update_var.get():
             print(f"Auto Update: {self.auto_update_var.get()}")
             self.auto_update()
         else:
             print(f"Auto Update: {self.auto_update_var.get()}")
-        
+
+
+
+
     def check_existing_window(self):
         import psutil
 
@@ -710,7 +730,6 @@ exit 0
         os._exit(0)
 
     def show_window(self):
-        # Restore the window
         self.bring_window_to_front()
 
 
@@ -783,8 +802,8 @@ exit 0
         right_frame = ttk.Frame(render_frame)
         right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=(0, 10))
         right_frame.columnconfigure(0, weight=2)
-        right_frame.rowconfigure(0, weight=3)  # Render Preview
-        right_frame.rowconfigure(1, weight=1)  # Buttons
+        right_frame.rowconfigure(0, weight=3) 
+        right_frame.rowconfigure(1, weight=1) 
 
         
         preview_label = ttk.Label(right_frame, text="Render Preview", font=("Segoe UI", 14, "bold"))
@@ -1394,14 +1413,18 @@ exit 0
 
         self.recent_projects_tree.bind("<Double-1>", self.on_project_double_click)
 
-        # --- Blender Manager Version Label ---
+        spacer_frame = ttkb.Frame(buttons_frame, height=20)
+        spacer_frame.grid(row=10, column=0, pady=(180, 0))  # Adds space below buttons
+
+
         self.bm_version_label = ttkb.Label(
-            self.main_menu_frame,
-            text=f"Blender Manager Version: {DEFAULT_SETTINGS['version']}",
+            buttons_frame,
+            text=f"Blender Manager v{DEFAULT_SETTINGS['version']}",
             style='Custom.Large.TLabel',
-            font=(self.button_font_family, 8)  
+            font=(self.button_font_family, 8)
         )
-        self.bm_version_label.grid(row=10, column=0, sticky="sw", padx=(10, 0), pady=(0, 5))
+        self.bm_version_label.grid(row=11, column=0, sticky="s", padx=(10, 0), pady=(10, 5))  # Properly spaced at the bottom
+
         self.update_bm_version_label()
 
     def update_bm_version_label(self):
@@ -1409,7 +1432,7 @@ exit 0
         current_version = self.settings.get("version", "0.0.0")
         latest_version = self.bm_get_latest_version()
 
-        version_text = f"Blender Manager Version: {current_version}"
+        version_text = f"Blender Manager v{current_version}"
     
         if latest_version and self.bm_is_new_version(current_version, latest_version):
             version_text += " ⚠️"
@@ -3680,21 +3703,21 @@ For further details, please refer to the user manual or visit our support site."
         plugins_frame = ttk.Frame(self.plugins_tab, padding=(10, 10, 10, 10))
         plugins_frame.pack(expand=1, fill='both')
 
-        directory_frame = ttk.Frame(plugins_frame)
-        directory_frame.pack(fill='x', padx=10, pady=(0, 5))
-
+        # Directory Selector and Entry
         self.directory_path = tk.StringVar(value=self.load_plugin_directory())
+        directory_frame = ttk.Frame(plugins_frame)
+        directory_frame.pack(anchor='w', padx=10, pady=(0, 5))
+
         self.directory_entry = ttk.Entry(directory_frame, textvariable=self.directory_path, width=50)
-        self.directory_entry.grid(row=0, column=0, padx=(0, 5), sticky='w')
+        self.directory_entry.pack(side='left', padx=(0, 5))
 
         self.browse_button = ttk.Button(
             directory_frame,
             text="Browse",
-            takefocus=False,
             command=self.browse_directory,
             style='Custom.TButton'
         )
-        self.browse_button.grid(row=0, column=1, padx=(0, 5), sticky='w')
+        self.browse_button.pack(side='left', padx=(0, 5))
 
         self.go_to_button = ttk.Button(
             directory_frame,
@@ -3703,38 +3726,39 @@ For further details, please refer to the user manual or visit our support site."
             command=self.go_to_file_path,
             style='Custom.TButton'
         )
-        self.go_to_button.grid(row=0, column=2, padx=(0, 5), sticky='e')
+        self.go_to_button.pack(side='left', padx=(0, 5))
 
-        version_label = ttk.Label(
+        self.add_plugin_button = ttk.Button(
             directory_frame,
-            text="Blender Version:",
-            font=('Segoe UI', 10, 'bold')
+            text="Add Addon",
+            takefocus=False,
+            command=self.add_plugin,
+            style='Custom.TButton'
         )
-        version_label.grid(row=0, column=3, padx=(10, 5), sticky='e')
+        self.add_plugin_button.pack(side='left', padx=(0, 5))
 
-        self.blender_versions = self.get_blender_versions_for_plugins()
-        self.version_var = tk.StringVar()
-        self.version_combobox = ttk.Combobox(
+        self.refresh_plugins_button = ttk.Button(
             directory_frame,
-            textvariable=self.version_var,
-            values=self.blender_versions,
-            state='readonly'
+            text="Refresh",
+            takefocus=False,
+            command=self.refresh_plugins_list,
+            style='Custom.TButton'
         )
-        self.version_combobox.set("Select Blender Version")
-        self.version_combobox.grid(row=0, column=4, padx=(0, 10), sticky='e')
-        self.version_combobox.bind("<<ComboboxSelected>>", self.on_blender_for_plugins_version_selected)
+        self.refresh_plugins_button.pack(side='left', padx=(0, 5))
 
+        # Search Bar Entry
         self.plugin_search_var = tk.StringVar()
         self.plugin_search_var.trace("w", lambda *args: self.on_plugin_search_change())
 
-
+        search_bar_frame = ttk.Frame(plugins_frame)
+        search_bar_frame.pack(anchor='w', padx=10, pady=(0, 10))
 
         self.plugin_search_entry = ttk.Entry(
-            plugins_frame,
+            search_bar_frame,
             textvariable=self.plugin_search_var,
             width=50
         )
-        self.plugin_search_entry.pack(anchor='w', padx=10, pady=(0, 10))
+        self.plugin_search_entry.pack(side='left', padx=(0, 5))
 
         self.plugin_placeholder_text = "Search Addons"
         self.plugin_search_entry.insert(0, self.plugin_placeholder_text)
@@ -3745,56 +3769,22 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
-
-        buttons_frame = ttk.Frame(plugins_frame)
-        buttons_frame.pack(side='left', padx=(10, 10), fill='y')
-
-        self.add_plugin_button = ttk.Button(
-            buttons_frame,
-            text="Add",
-            takefocus=False,
-            command=self.add_plugin,
-            style='Custom.TButton',
-            padding=(15, 10)  
+        self.blender_versions = self.get_blender_versions_for_plugins()
+        self.version_var = tk.StringVar()
+        self.version_combobox = ttk.Combobox(
+            search_bar_frame,
+            textvariable=self.version_var,
+            values=self.blender_versions,
+            state='readonly'
         )
-        self.add_plugin_button.pack(pady=(10, 10), fill='x')
+        self.version_combobox.set("Select Blender Version")
+        self.version_combobox.pack(side='left', padx=(0, 5))
+        self.version_combobox.bind("<<ComboboxSelected>>", self.on_blender_for_plugins_version_selected)
 
-        self.remove_plugin_button = ttk.Button(
-            buttons_frame,
-            text="Remove",
-            takefocus=False,
-            command=self.remove_plugin,
-            style='Custom.TButton',
-            padding=(15, 10)
-        )
-        self.remove_plugin_button.pack(pady=(10, 10), fill='x')
-
-        # View Plugin Content Button
-        self.view_plugin_button = ttk.Button(
-            buttons_frame,
-            text="Info",
-            takefocus=False,
-            command=self.view_plugin_content,
-            style='Custom.TButton',
-            padding=(15, 10)
-        )
-        self.view_plugin_button.pack(pady=(10, 10), fill='x')
-
-        # Refresh Plugins List Button
-        self.refresh_plugins_button = ttk.Button(
-            buttons_frame,
-            text="Refresh",
-            takefocus=False,
-            command=self.refresh_plugins_list,
-            style='Custom.TButton',
-            padding=(15, 10)
-        )
-        self.refresh_plugins_button.pack(pady=(10, 10), fill='x')
-
-        style = ttkb.Style()
-        self.style.configure("PluginManagement.Treeview", font=('Segoe UI', 12), rowheight=30)  
-        self.style.configure("PluginManagement.Treeview.Heading", font=('Segoe UI', 14, 'bold'))  
-
+        # Plugins Treeview
+        style = ttk.Style()
+        self.style.configure("PluginManagement.Treeview", font=('Segoe UI', 12), rowheight=30)
+        self.style.configure("PluginManagement.Treeview.Heading", font=('Segoe UI', 14, 'bold'))
 
         self.plugins_tree = ttk.Treeview(
             plugins_frame,
@@ -3818,8 +3808,42 @@ For further details, please refer to the user manual or visit our support site."
         self.plugins_tree.drop_target_register(DND_FILES)
         self.plugins_tree.dnd_bind('<<Drop>>', self.handle_treeview_drop)
 
+        # Add Context Menu for Plugins
+        self.plugin_context_menu = tk.Menu(self.plugins_tree, tearoff=0)
+        self.plugin_context_menu.add_command(label="Delete", command=self.remove_plugin)
+        self.plugin_context_menu.add_command(label="Info", command=self.view_plugin_content)
+        self.plugin_context_menu.add_command(label="View Documentation", command=self.view_plugin_document)
+        self.duplicate_menu = tk.Menu(self.plugin_context_menu, tearoff=0)
+        self.plugin_context_menu.add_cascade(label="Duplicate to...", menu=self.duplicate_menu)
+        # Bind Right-Click to Plugins Treeview
+        self.plugins_tree.bind("<Button-3>", self.show_plugin_context_menu)
+
         self.refresh_plugins_list()
 
+    def show_plugin_context_menu(self, event):
+        """Displays the context menu for the selected plugin."""
+        # Select the item under right-click
+        item_id = self.plugins_tree.identify_row(event.y)
+        if item_id:
+            self.plugins_tree.selection_set(item_id)
+            self.plugin_context_menu.tk_popup(event.x_root, event.y_root)
+
+    def delete_selected_plugin(self):
+        """Deletes the selected plugin."""
+        selected_item = self.plugins_tree.selection()
+        if selected_item:
+            plugin_name = self.plugins_tree.item(selected_item, "values")[0]
+            # Confirm and delete logic here
+            print(f"Deleting plugin: {plugin_name}")
+            self.plugins_tree.delete(selected_item)  # Simulate deletion
+
+    def show_plugin_info(self):
+        """Shows information about the selected plugin."""
+        selected_item = self.plugins_tree.selection()
+        if selected_item:
+            plugin_info = self.plugins_tree.item(selected_item, "values")
+            # Show plugin info logic here (e.g., open a popup or print info)
+            print(f"Plugin Info: {plugin_info}")
 
         
 
@@ -3827,7 +3851,152 @@ For further details, please refer to the user manual or visit our support site."
 
         #-----------Functions----------#
 
+
+
+
+    def update_duplicate_menu(self):
+        """Updates the 'Duplicate to...' submenu with available Blender versions."""
+        self.duplicate_menu.delete(0, "end")  # Clear existing items
+
+        blender_versions = self.get_blender_versions_for_plugins()
+        if not blender_versions:
+            self.duplicate_menu.add_command(label="No versions found", state="disabled")
+            return
+
+        for version in blender_versions:
+            self.duplicate_menu.add_command(
+                label=version,
+                command=lambda v=version: self.duplicate_addon_to_version(v)
+            )
+
+    def show_plugin_context_menu(self, event):
+        """Displays the context menu for the selected plugin."""
+        # Select the item under right-click
+        item_id = self.plugins_tree.identify_row(event.y)
+        if item_id:
+            self.plugins_tree.selection_set(item_id)
+            self.update_duplicate_menu()  # Update submenu before showing context menu
+            self.plugin_context_menu.tk_popup(event.x_root, event.y_root)
+
+    def duplicate_addon_to_version(self, target_version):
+        """Duplicate the selected addon to the specified Blender version."""
+        selected_item = self.plugins_tree.focus()
+        if not selected_item:
+            messagebox.showerror("Error", "No addon selected.")
+            return
+
+        # Get the selected addon name and path
+        addon_name = self.plugins_tree.item(selected_item, "values")[0]
+        current_addon_path = os.path.join(self.directory_path.get(), addon_name)
+
+        if not os.path.exists(current_addon_path):
+            messagebox.showerror("Error", "The selected addon does not exist.")
+            return
+
+        # Construct the target addon directory path
+        target_addon_path = os.path.join(
+            os.getenv('APPDATA'),
+            "Blender Foundation",
+            "Blender",
+            target_version,
+            "scripts",
+            "addons",
+            addon_name
+        )
+
+        os.makedirs(os.path.dirname(target_addon_path), exist_ok=True)
+
+        try:
+            if os.path.isdir(current_addon_path):
+                shutil.copytree(current_addon_path, target_addon_path)
+            elif os.path.isfile(current_addon_path):
+                shutil.copy2(current_addon_path, target_addon_path)
+            messagebox.showinfo(
+                "Success", f"Addon '{addon_name}' has been duplicated to Blender {target_version}."
+            )
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to duplicate addon: {e}")
+
+
+
+
+
     
+    def view_plugin_document(self):
+        """Open the documentation link for the selected plugin."""
+        import webview
+        selected_item = self.plugins_tree.focus()
+        if not selected_item:
+            messagebox.showerror("Error", "No addon selected.")
+            return
+
+        plugin_name = self.plugins_tree.item(selected_item)['values'][0]
+        plugin_folder_path = os.path.join(self.directory_path.get(), plugin_name)
+
+        if os.path.isfile(plugin_folder_path + ".py"):
+            addon_file = plugin_folder_path + ".py"
+        else:
+            addon_file = os.path.join(plugin_folder_path, "__init__.py")
+
+        if not os.path.exists(addon_file):
+            messagebox.showerror("Error", "The selected plugin does not have an accessible file.")
+            return
+
+        def extract_bl_info(file_path):
+            """Extract the bl_info dictionary from a Python file."""
+            try:
+                with open(file_path, 'r', encoding='utf-8-sig') as f:
+                    content = f.read()
+                    bl_info_match = re.search(r"bl_info\s*=\s*\{.*?\}", content, re.DOTALL)
+                    if bl_info_match:
+                        try:
+                            return eval(bl_info_match.group(0).split("=", 1)[1])
+                        except Exception as e:
+                            print(f"Failed to eval regex-extracted bl_info: {e}")
+
+                    tree = ast.parse(content, filename=file_path)
+                    for node in tree.body:
+                        if isinstance(node, ast.Assign):
+                            for target in node.targets:
+                                if isinstance(target, ast.Name) and target.id == 'bl_info':
+                                    try:
+                                        return ast.literal_eval(node.value)
+                                    except Exception as e:
+                                        print(f"Failed to literal_eval bl_info: {e}")
+            except Exception as e:
+                print(f"Failed to read bl_info from {file_path}: {e}")
+            return None
+
+        bl_info = extract_bl_info(addon_file)
+        if not bl_info:
+            messagebox.showerror("Error", "Could not extract bl_info from the addon.")
+            return
+
+        doc_url = bl_info.get("doc_url")
+        wiki_url = bl_info.get("wiki_url")
+        ref_url = bl_info.get("#ref")
+
+        url_to_open = doc_url or wiki_url or ref_url
+
+        if url_to_open:
+            try:
+                webview.create_window(f"{plugin_name} Documentation", url_to_open)
+                webview.start()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to open the documentation: {e}")
+        else:
+            messagebox.showinfo("Info", "No documentation URL found for this plugin.")
+
+
+
+
+
+
+
+
+
+
+
     def get_blender_versions_for_plugins(self):
         """Retrieve available Blender versions from the AppData directory."""
         versions = []
@@ -4186,7 +4355,7 @@ For further details, please refer to the user manual or visit our support site."
                     with open(file_path, 'r', encoding='utf-8') as f:
                         content = f.read()
                     content_window = tk.Toplevel(self)
-                    content_window.title(f"Content of {plugin_name}")
+                    content_window.title(f" {plugin_name} Info")
                     text_widget = tk.Text(content_window, wrap='word')
                     text_widget.insert('1.0', content)
                     text_widget.pack(expand=1, fill='both')
@@ -4223,7 +4392,6 @@ For further details, please refer to the user manual or visit our support site."
         projects_frame = ttk.Frame(self.project_management_tab, padding=(10, 10, 10, 10))
         projects_frame.pack(expand=1, fill='both')
 
-        # Directory Selector and Entry
         self.project_directory_path = tk.StringVar(value=self.load_project_directory())
         project_directory_frame = ttk.Frame(projects_frame)
         project_directory_frame.pack(anchor='w', padx=10, pady=(0, 5))
@@ -5350,7 +5518,6 @@ elif '{export_format}' == 'abc':
                 self.transfer_to_menu_button.configure(state='disabled', text='Transfering...')
                 print(f"Transfering {source_folder} to {target_folder} ")
             
-                # Clear the target directory
                 if os.path.exists(target_folder):
                     shutil.rmtree(target_folder)
                 os.makedirs(target_folder)
