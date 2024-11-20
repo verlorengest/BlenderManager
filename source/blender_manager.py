@@ -37,16 +37,17 @@ import tempfile
 import ast 
 import certifi
 import ssl
+import psutil
 
 end_time = time.time()
 print(f"imports loaded in {end_time - start_time}.") 
 CONFIG_FILE_PATH = os.path.join(os.path.expanduser("~"), ".BlenderManager", "config.json")
 
 DEFAULT_SETTINGS = {
-    "version": "0.0.5",
+    "version": "0.0.6",
     "selected_theme": "darkly",
     "auto_update_checkbox": True,
-    "bm_auto_update_checkbox": True,
+    "bm_auto_update_checkbox": False,
     "launch_on_startup":False,
     "run_in_background": True,
     "chunk_size_multiplier": 3,
@@ -55,7 +56,12 @@ DEFAULT_SETTINGS = {
     "treeview_heading_font_size": 14,
     "treeview_font_family": "Segoe UI",
     "button_font_family": "Segoe UI",
-    "button_font_size": 14
+    "button_font_size": 14,
+    "show_addon_management": True,
+    "show_project_management": True,
+    "show_render_management": True,
+    "show_version_management": True,
+    "show_installation": True
 }
 
 BLENDER_MANAGER_DIR = os.path.join(os.path.expanduser("~"), ".BlenderManager")
@@ -131,8 +137,8 @@ class BlenderManagerApp(TkinterDnD.Tk):
         super().__init__()
         
         start_time = time.time()
-        
-        self.check_existing_window()
+        self.tray_name = "Blender Manager"
+        self.check_existing_window_and_tray()
         self.title("Blender Manager")     
         self.geometry("900x600")
         threading.Thread(target=self.initialize_app, daemon=True).start()
@@ -176,7 +182,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.queue = queue.Queue()
         self.create_widgets()
         self.check_queue()
-        self.render_file_paths = {}
+        
         self.notes_data = self._load_notes()
         self.current_render_name = None     
         self.menu_cache = {}  
@@ -184,7 +190,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.create_main_menu()
         self.redirect_output()
         self.start_time = time.time() 
-        self.refresh_render_list()
+        
         with open(BASE_MESH_PATH, 'r') as file:
             base_meshes = json.load(file)
         self.base_meshes = base_meshes  
@@ -351,7 +357,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
             elif current_os == 'linux':
                 script_path = self.create_linux_update_script(extract_dir)
             else:
-                messagebox.showerror("Update Error", "Unsupported operating system.")
+                messagebox.showerror("Update Error", "Unsupported operating system. Please install manually.")
                 self.bm_close_loading_screen()
                 return
 
@@ -362,14 +368,14 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
         except Exception as e:
             self.bm_close_loading_screen()
-            messagebox.showerror("Update Error", f"Failed to install update: {e}")
+            messagebox.showerror("Update Error", f"Failed to install update: {e} Please install manually.")
         finally:
             shutil.rmtree(temp_dir)
 
 
 
     def create_windows_update_script(self, extract_dir):
-        """update function for Windows"""
+        """Update function for Windows"""
         script_path = os.path.join(extract_dir, "update.bat")
         executable_path = os.path.join(os.getcwd(), "blender_manager.exe")
 
@@ -390,7 +396,8 @@ set "destination={os.path.dirname(executable_path)}"
 
 xcopy /s /e /y "%source%\\*" "%destination%"
 if %errorlevel% neq 0 (
-    echo Update failed. Unable to copy files.
+    echo Update failed. Unable to copy files. Please install manually.
+    powershell -Command "Add-Type -AssemblyName PresentationFramework; $result = [System.Windows.MessageBox]::Show('Update failed. Unable to copy files. Please install manually.', 'Update Error', 'OK', 'Error'); if ($result -eq 'OK') {{ Start-Process 'https://yourwebsite.com/manual-update' }}"
     exit /b 1
 )
 
@@ -403,9 +410,12 @@ exit
         return script_path
 
 
+
     def create_macos_update_script(self, extract_dir):
-        """update function for macOS"""
-        script_path = os.path.join(extract_dir, "update_installer.sh")
+        """Create update script for macOS."""
+        import os
+
+        script_path = os.path.join(extract_dir, "update.sh")
         executable_path = os.path.join(os.getcwd(), "blender_manager")
 
         inner_dirs = [d for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
@@ -414,23 +424,34 @@ exit
 
         inner_folder_path = os.path.join(extract_dir, inner_dirs[0])
 
-        with open(script_path, 'w') as script_file:
+        with open(script_path, 'w', encoding='utf-8') as script_file:
             script_file.write(f"""
 #!/bin/bash
 sleep 2
-cp -r "{inner_folder_path}/"* "{os.getcwd()}/"
+
+source="{inner_folder_path}"
+destination="{os.path.dirname(executable_path)}"
+
+cp -R "$source/." "$destination/"
+if [ $? -ne 0 ]; then
+    osascript -e 'display alert "Update Error" message "Update failed. Unable to copy files. Please install manually." as critical buttons {{"OK"}} default button "OK"'
+    exit 1
+fi
+
 open "{executable_path}"
+rm -rf "{extract_dir}"
 exit 0
             """)
 
-        os.chmod(script_path, 0o755)
         return script_path
 
 
 
     def create_linux_update_script(self, extract_dir):
-        """update function for Linux"""
-        script_path = os.path.join(extract_dir, "update_installer.sh")
+        """Create update script for Linux."""
+        import os
+
+        script_path = os.path.join(extract_dir, "update.sh")
         executable_path = os.path.join(os.getcwd(), "blender_manager")
 
         inner_dirs = [d for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
@@ -439,16 +460,25 @@ exit 0
 
         inner_folder_path = os.path.join(extract_dir, inner_dirs[0])
 
-        with open(script_path, 'w') as script_file:
+        with open(script_path, 'w', encoding='utf-8') as script_file:
             script_file.write(f"""
 #!/bin/bash
 sleep 2
-cp -r "{inner_folder_path}/"* "{os.getcwd()}/"
-xdg-open "{executable_path}"
+
+source="{inner_folder_path}"
+destination="{os.path.dirname(executable_path)}"
+
+cp -R "$source/." "$destination/"
+if [ $? -ne 0 ]; then
+    zenity --error --text="Update failed. Unable to copy files. Please install manually."
+    exit 1
+fi
+
+"{executable_path}" &
+rm -rf "{extract_dir}"
 exit 0
             """)
 
-        os.chmod(script_path, 0o755)
         return script_path
 
 
@@ -516,24 +546,32 @@ exit 0
             print(f"Error Loading: {e}")
                     
 
-
     def load_settings_on_begining(self):
+        """Load settings and initialize variables."""
         self.settings = load_config()
         self.bm_load_current_version()
         self.update_version_in_config()
+
+        self.tab_visibility_settings = {
+            "Addon Management": self.settings.get("show_addon_management", True),
+            "Project Management": self.settings.get("show_project_management", True),
+            "Render Management": self.settings.get("show_render_management", True),
+            "Version Management": self.settings.get("show_version_management", True),
+            "Installation": self.settings.get("show_installation", True),
+        }
+
         selected_theme = self.settings.get("selected_theme", "darkly")
         self.style = ttkb.Style()
         if selected_theme in self.style.theme_names():
             self.style.theme_use(selected_theme)
             print(f"Theme applied: {selected_theme}")
-        else:           
+        else:
             self.style.theme_use("darkly")
             self.settings["selected_theme"] = "darkly"
             save_config(self.settings)
             print("Invalid theme. Default theme 'darkly' applied.")
-            
-        # load data
-        self.selected_theme = tk.StringVar(value=self.settings.get("selected_theme", "darkly"))
+
+        self.bm_auto_update_var = tk.BooleanVar(value=self.settings.get("bm_auto_update_checkbox", False))
         self.auto_update_var = tk.BooleanVar(value=self.settings.get("auto_update_checkbox", True))
         self.launch_on_startup_var = tk.BooleanVar(value=self.settings.get("launch_on_startup", False))
         self.run_in_background_var = tk.BooleanVar(value=self.settings.get("run_in_background", True))
@@ -563,55 +601,36 @@ exit 0
     
 
     def create_widgets(self):
-        # Main Frame
+        """Create the GUI layout."""
         main_frame = ttkb.Frame(self, padding=(20, 20, 20, 20))
         main_frame.pack(expand=1, fill='both')
-        font_family = self.button_font_family
 
-        # Configure styles for dynamic scaling
-        self.style.configure("TNotebook.Tab", font=(font_family, 10))
-
-        # Notebook
+        self.style.configure("TNotebook.Tab", font=(self.button_font_family, 10))
         self.notebook = ttkb.Notebook(main_frame)
         self.notebook.pack(expand=1, fill='both')
 
-        # Tabs
         self.main_menu_tab = ttk.Frame(self.notebook)
-        self.installed_tab = ttkb.Frame(self.notebook)
-        self.install_tab = ttkb.Frame(self.notebook)
-        self.logs_tab = ttkb.Frame(self.notebook)
-        self.plugins_tab = ttkb.Frame(self.notebook)
-        self.project_management_tab = ttkb.Frame(self.notebook)
-        self.render_management_tab = ttkb.Frame(self.notebook)
-
-        # Add tabs
         self.notebook.add(self.main_menu_tab, text="Main Menu")
-        self.notebook.add(self.installed_tab, text='Version Management')
-        self.notebook.add(self.install_tab, text='Installation')
-        self.notebook.add(self.plugins_tab, text='Addon Management')
-        self.notebook.add(self.project_management_tab, text='Project Management')
-        self.notebook.add(self.render_management_tab, text='Render Management')
-        self.notebook.add(self.logs_tab, text='Logs')
-
-        # Call tab-specific creation methods
-        self.create_plugins_tab()
-        self.create_project_management_tab()
-        self.create_render_management_tab()
-        self.create_installed_tab()
-        self.create_install_tab()
-        self.create_logs_tab()
         self.create_main_menu()
+
+        for tab_name, is_visible in self.tab_visibility_settings.items():
+            if is_visible:
+                self.toggle_tab_visibility(tab_name, tk.BooleanVar(value=True))
+
+
+        self.logs_tab = ttkb.Frame(self.notebook)
+        self.notebook.add(self.logs_tab, text="Logs")
+        self.create_logs_tab()
+
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
-
         main_frame.grid_rowconfigure(0, weight=1)
         main_frame.grid_columnconfigure(0, weight=1)
 
-        # Check for updates
         self.current_version = self.bm_load_current_version()
         self.latest_version = None
-        if DEFAULT_SETTINGS.get("auto_update_checkbox", True):
+        if self.settings.get("bm_auto_update_checkbox", True):
             print("Checking Blender Manager updates...")
             self.bm_check_for_updates_threaded()
 
@@ -622,41 +641,81 @@ exit 0
             print(f"Auto Update: {self.auto_update_var.get()}")
 
 
-
-
-    def check_existing_window(self):
-        import psutil
-
-
-        current_pid = os.getpid()
-        current_path = os.path.abspath(sys.argv[0])
-
-        possible_exe_names = ["blender_manager.exe", "Blender Manager.exe", "Blender_Manager.exe", "BlenderManager.exe"]
-
+    def is_tray_icon_running(self):
+        """Check if a tray application with the given name is running."""
         try:
-            tasklist_output = subprocess.check_output("tasklist", shell=True).decode()
-
-            for exe_name in possible_exe_names:
-                if exe_name in tasklist_output:
-                    for process in psutil.process_iter(attrs=['pid', 'exe']):
-                        if process.pid != current_pid and process.info['exe']:
-                            if os.path.samefile(process.info['exe'], current_path):
-                                self.bring_window_to_front()
-                                sys.exit()
+            for process in psutil.process_iter(attrs=['name']):
+                if process.info['name'] and self.tray_name.lower() in process.info['name'].lower():
+                    return True
+        except FileNotFoundError as e:
+            print(f"FileNotFoundError: {e}")
         except Exception as e:
-            print(f"Error checking for existing window: {e}")
-            
+            print(f"Unexpected error checking tray: {e}")
+        return False
 
-    def bring_window_to_front(self):
-        """Uses Windows API to bring the existing window to the front."""
+
+
+    def find_window_with_tray_name(self, tray_name):
+        """Find a tray window with the specified name."""
+        def enum_windows_callback(hwnd, lParam):
+            length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
+            if length > 0:
+                title = ctypes.create_unicode_buffer(length + 1)
+                ctypes.windll.user32.GetWindowTextW(hwnd, title, length + 1)
+                if tray_name.lower() in title.value.lower():
+                    windows.append(hwnd)
+            return True
+
+        EnumWindowsProc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_void_p)
+        windows = []
+        ctypes.windll.user32.EnumWindows(EnumWindowsProc(enum_windows_callback), None)
+        return windows[0] if windows else None
+
+
+    def bring_window_to_front(self, hwnd=None):
+        """Bring the application's window or tray to the front."""
         try:
-            hwnd = ctypes.windll.user32.FindWindowW(None, "Blender Manager")
             if hwnd:
-                ctypes.windll.user32.ShowWindow(hwnd, 5)  # SW_SHOW
+                ctypes.windll.user32.ShowWindow(hwnd, 9)  
                 ctypes.windll.user32.SetForegroundWindow(hwnd)
+            else:
+                hwnd = ctypes.windll.user32.FindWindowW(None, self.tray_name)
+                if hwnd:
+                    ctypes.windll.user32.ShowWindow(hwnd, 9)
+                    ctypes.windll.user32.SetForegroundWindow(hwnd)
         except Exception as e:
             print(f"Error bringing window to front: {e}")
-            messagebox.showerror("Error", "Failed to bring the existing window to the front.")
+
+    def check_existing_window_and_tray(self):
+        try:
+            current_pid = os.getpid()
+            current_path = os.path.realpath(sys.argv[0])
+
+            hwnd = self.find_window_with_tray_name(self.tray_name)
+            if hwnd:
+                self.bring_window_to_front(hwnd)
+                print(f"Tray window found with name: {self.tray_name}")
+                sys.exit()
+
+            for process in psutil.process_iter(attrs=['pid', 'exe']):
+                try:
+                    if process.pid != current_pid:
+                        exe_path = process.info.get('exe')
+                        if exe_path and os.path.samefile(os.path.realpath(exe_path), current_path):
+                            print(f"Found existing process for path: {exe_path}")
+                            self.bring_window_to_front()
+                            sys.exit()
+                except (psutil.AccessDenied, psutil.NoSuchProcess, FileNotFoundError):
+                    continue
+
+        except FileNotFoundError as e:
+            print(f"FileNotFoundError while checking window/tray: {e}")
+        except Exception as e:
+            print(f"Error checking for existing window or tray: {e}")
+
+
+
+
 
 
 
@@ -866,7 +925,8 @@ exit 0
         save_note_button.grid(row=2, column=0, sticky="ew", padx=5, pady=(5, 0))
 
         render_frame.grid_propagate(True)
-        
+        self.render_file_paths = {}
+        self.refresh_render_list()
 
 
         #--------------Render Menu Methods--------------
@@ -924,9 +984,7 @@ exit 0
         """Sort Treeview columns when headers are clicked."""
         try:
             l = [(self.render_tree.set(k, col), k) for k in self.render_tree.get_children('')]
-            # attempt to convert to appropriate type for sorting
             try:
-                # remove any nonnumeric characters for numerical sorting
                 l = [(float(re.sub('[^0-9.]', '', item[0])), item[1]) for item in l]
             except ValueError:
                 pass  
@@ -2758,12 +2816,12 @@ For further details, please refer to the user manual or visit our support site."
         notebook.pack(expand=1, fill='both')
 
         tab2 = ttk.Frame(notebook)
-        tab3 = ttk.Frame(notebook)
-
+        settings_tab = ttk.Frame(notebook)
+        blender_settings_tab = ttk.Frame(notebook)
 
         notebook.add(tab2, text="Preferences")
-        notebook.add(tab3, text="Settings")
-
+        notebook.add(settings_tab, text="Settings")
+        notebook.add(blender_settings_tab, text="Blender Settings")
 
         theme_frame = ttk.LabelFrame(tab2, text="Appearance Settings", padding=(10, 10))
         theme_frame.pack(fill='both', expand=True, padx=10, pady=10)
@@ -2902,78 +2960,13 @@ For further details, please refer to the user manual or visit our support site."
         if current_theme in available_themes:
             theme_listbox.selection_set(available_themes.index(current_theme))
 
-        advanced_frame = ttkb.Frame(tab3)
-        advanced_frame.pack(anchor="nw", padx=10, pady=10, expand=True, fill="both")
+        advanced_frame = ttkb.Frame(settings_tab)
+        advanced_frame.pack(anchor="nw", padx=5, pady=5, expand=True, fill="both")
 
-        self.auto_update_checkbox_widget = ttkb.Checkbutton(
-            advanced_frame,
-            text="Auto Update",
-            variable=self.auto_update_var,
-            bootstyle="success",
-            command=self.toggle_auto_update
-        )
-        self.auto_update_checkbox_widget.grid(row=0, column=0, sticky="w", padx=10, pady=5)
-
-        self.launch_on_startup_checkbox = ttkb.Checkbutton(
-            advanced_frame,
-            text="Launch on Startup",
-            variable=self.launch_on_startup_var,
-            bootstyle="success",
-            command=self.toggle_launch_on_startup
-        )
-        self.launch_on_startup_checkbox.grid(row=1, column=0, sticky="w", padx=10, pady=5)
-
-        self.run_in_background_checkbox = ttkb.Checkbutton(
-            advanced_frame,
-            text="Run in Background",
-            variable=self.run_in_background_var,
-            bootstyle="success",
-            command=self.toggle_run_in_background
-        )
-        self.run_in_background_checkbox.grid(row=2, column=0, sticky="w", padx=10, pady=5)
-
-        self.setup_button = ttkb.Button(
-            advanced_frame,
-            text="Setup Addon",
-            takefocus=False,
-            command=self.run_setup
-        )
-        self.setup_button.grid(row=3, column=0, sticky="w", padx=10, pady=5)
-
-        self.tooltip_label = ttk.Label(
-            advanced_frame,
-            text="You must install the addon for the program to work properly.",
-            font=("Arial", 10)
-        )
-        self.tooltip_label.grid(row=4, column=0, sticky="w", padx=10, pady=5)
-
-        self.change_launch_blender_button = ttkb.Button(
-            advanced_frame,
-            text="Change Launch Folder",
-            takefocus=False,
-            command=self.change_launch_blender
-        )
-        self.change_launch_blender_button.grid(row=5, column=0, sticky="w", padx=10, pady=5)
+        left_frame = ttkb.Frame(advanced_frame)
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
 
-
-        chunk_size_frame = ttkb.LabelFrame(tab3, text="Download Chunk Size Multiplier", padding=(10, 10))
-        chunk_size_frame.pack(anchor="nw", padx=10, pady=10, fill="x")
-
-        self.chunk_size_label = ttkb.Label(chunk_size_frame, text=f"Multiplier: {self.chunk_size_multiplier}x")
-        self.chunk_size_label.pack(anchor="w", padx=10, pady=5)
-
-        self.chunk_size_var = tk.IntVar(value=self.chunk_size_multiplier)
-        self.chunk_size_slider = ttkb.Scale(
-            chunk_size_frame,
-            from_=1,
-            to=10,
-            variable=self.chunk_size_var,
-            orient="horizontal",
-            command=self.update_chunk_size_multiplier,
-            bootstyle="success"
-        )
-        self.chunk_size_slider.pack(fill="x", padx=10, pady=5)
 
 
         button_font_family = self.button_font_family
@@ -2986,8 +2979,173 @@ For further details, please refer to the user manual or visit our support site."
             borderwidth=0
         )
 
-        button_frame = ttkb.Frame(tab3)
-        button_frame.pack(anchor="s", padx=10, pady=10) 
+
+
+        self.style.configure(
+            'Unique.TButton',
+            font=("Arial", 8), 
+            padding=(2, 1), 
+            borderwidth=1,
+            relief="flat",
+            background="#e1e1e1",  
+            foreground="#000000"  
+        )
+
+        self.setup_button = ttkb.Button(
+            left_frame,
+            text="Setup Addon",
+            takefocus=False,
+            command=self.run_setup,
+            width=18, 
+            style="Unique.TButton"
+        )
+        self.setup_button.grid(row=0, column=0, sticky="w", padx=2, pady=1)
+
+        self.question_label = ttk.Label(
+            left_frame,
+            text="?",
+            font=("Arial", 9, "bold"),
+            foreground="blue",  
+            cursor="hand2"
+        )
+        self.question_label.grid(row=0, column=1, sticky="w", padx=3, pady=1)
+        self.question_label.bind("<Button-1>", lambda e: messagebox.showinfo("Info", "Install first time or update the addon from here. Blender Manager addon is important for the app to work properly."))
+
+        self.change_launch_blender_button = ttkb.Button(
+            left_frame,
+            text="Change Launch Folder",
+            takefocus=False,
+            command=self.change_launch_blender,
+            width=18,  
+            style="Unique.TButton"
+        )
+        self.change_launch_blender_button.grid(row=1, column=0, sticky="w", padx=2, pady=1)
+
+        left_frame.grid_columnconfigure(0, weight=1)
+        left_frame.grid_columnconfigure(1, weight=0)
+
+
+
+        self.auto_update_checkbox_widget = ttkb.Checkbutton(
+            left_frame,
+            text="Auto Update",
+            variable=self.auto_update_var,
+            bootstyle="success",
+            command=self.toggle_auto_update
+        )
+        self.auto_update_checkbox_widget.grid(row=2, column=0, sticky="w", padx=5, pady=3)
+
+
+        self.bm_auto_update_checkbox_widget = ttkb.Checkbutton(
+            left_frame,
+            text="BM Auto Update",
+            variable=self.bm_auto_update_var,
+            bootstyle="success",
+            command=self.toggle_bm_auto_update
+        )
+        self.bm_auto_update_checkbox_widget.grid(row=3, column=0, sticky="w", padx=5, pady=3)
+
+
+        self.launch_on_startup_checkbox = ttkb.Checkbutton(
+            left_frame,
+            text="Launch on Startup",
+            variable=self.launch_on_startup_var,
+            bootstyle="success",
+            command=self.toggle_launch_on_startup
+        )
+        self.launch_on_startup_checkbox.grid(row=4, column=0, sticky="w", padx=5, pady=3)
+
+        self.run_in_background_checkbox = ttkb.Checkbutton(
+            left_frame,
+            text="Run in Background",
+            variable=self.run_in_background_var,
+            bootstyle="success",
+            command=self.toggle_run_in_background
+        )
+        self.run_in_background_checkbox.grid(row=5, column=0, sticky="w", padx=5, pady=3)
+
+        chunk_size_frame = ttk.LabelFrame(left_frame, text="Download Chunk Size Multiplier", padding=(5, 5))
+        chunk_size_frame.grid(row=6, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
+
+        self.chunk_size_label = ttkb.Label(chunk_size_frame, text=f"Multiplier: {self.chunk_size_multiplier}x")
+        self.chunk_size_label.pack(anchor="w", padx=5, pady=3)
+
+        self.chunk_size_var = tk.IntVar(value=self.chunk_size_multiplier)
+        self.chunk_size_slider = ttkb.Scale(
+            chunk_size_frame,
+            from_=1,
+            to=10,
+            variable=self.chunk_size_var,
+            orient="horizontal",
+            command=self.update_chunk_size_multiplier,
+            bootstyle="success"
+        )
+        self.chunk_size_slider.pack(fill="x", padx=5, pady=3)
+
+        right_frame = ttk.LabelFrame(advanced_frame, text="Tab Visibility Settings", padding=(5, 5))
+        right_frame.grid(row=0, column=1, rowspan=6, sticky="nsew", padx=5, pady=5)
+
+        self.tab_visibility_vars = {
+            "Addon Management": tk.BooleanVar(value=self.settings.get("show_addon_management", True)),
+            "Project Management": tk.BooleanVar(value=self.settings.get("show_project_management", True)),
+            "Render Management": tk.BooleanVar(value=self.settings.get("show_render_management", True)),
+            "Version Management": tk.BooleanVar(value=self.settings.get("show_version_management", True)),
+            "Installation": tk.BooleanVar(value=self.settings.get("show_installation", True)),
+        }
+
+        row = 0
+        for tab_name, var in self.tab_visibility_vars.items():
+            ttkb.Checkbutton(
+                right_frame,
+                text=f"Show {tab_name} Tab",
+                variable=var,
+                bootstyle="success",
+                command=lambda name=tab_name, var=var: self.toggle_tab_visibility(name, var)
+            ).grid(row=row, column=0, sticky="w", padx=5, pady=3)
+            row += 1
+
+        help_icon = ttk.Label(
+            right_frame,
+            text="?",
+            font=("Segoe UI", 10, "bold"),
+            foreground="blue",
+            cursor="hand2"
+        )
+        help_icon.grid(row=row+2, column=0, sticky="e", padx=5, pady=3)
+
+        help_icon.bind(
+            "<Button-1>",
+            lambda e: messagebox.showinfo(
+                "Tab Visibility Settings Info",
+                "These settings allow you to toggle the visibility of specific tabs in the Blender Manager. "
+                "Hiding the tabs you don't need, can speed up the application's startup."
+                "To apply changes, restart the application after making adjustments."
+            )
+        )
+
+        info_label = ttkb.Label(
+            right_frame,
+            text="You need to restart the Blender Manager to apply changes.",
+            font=("Segoe UI", 7, "italic"),
+            foreground="grey"
+        )
+        info_label.grid(row=row, column=0, sticky="w", padx=7, pady=(10, 0))
+
+
+        row += 1
+
+        restart_button = ttkb.Button(
+            right_frame,
+            text="Restart",
+            style="Unique.TButton",
+            command=self.restart_application
+        )
+        restart_button.grid(row=row, column=0, sticky="w", padx=7, pady=(10, 0))
+
+
+
+        button_frame = ttkb.Frame(settings_tab)
+        button_frame.pack(anchor="s", padx=5, pady=5) 
 
         reset_button = ttkb.Button(
             button_frame,
@@ -2996,35 +3154,88 @@ For further details, please refer to the user manual or visit our support site."
             command=self.reset_all_data,
             style="Small.TButton"  
         )
-        reset_button.pack(side="left", padx=5)
+        reset_button.pack(side="left", padx=3)
 
         self.delete_all_versions_button = ttkb.Button(
             button_frame,
-            text="Delete All Blender Versions",
+            text="Delete All Versions",
             takefocus=False,
             command=self.delete_all_blender_versions,
             style="Small.TButton"  
         )
-        self.delete_all_versions_button.pack(side="left", padx=5)
+        self.delete_all_versions_button.pack(side="left", padx=3)
 
-        self.delete_main_blender_button = ttkb.Button(
-            button_frame,
-            text="Delete Main Blender",
-            takefocus=False,
-            command=self.delete_main_blender_version,
-            style="Small.TButton"  
-        )
-        self.delete_main_blender_button.pack(side="left", padx=5)
-        
         self.reset_defaults_button = ttkb.Button(
             button_frame,
-            text="Reset to Defaults",
+            text="Reset Defaults",
             takefocus=False,
             command=self.reset_to_default_settings,
             style="Small.TButton"
         )
-        self.reset_defaults_button.pack(side="left", padx=5)
+        self.reset_defaults_button.pack(side="left", padx=3)
 
+
+
+        blender_settings_frame = ttk.Frame(blender_settings_tab, padding=(10, 10))
+        blender_settings_frame.pack(expand=1, fill="both")
+
+        left_frame = ttk.LabelFrame(blender_settings_frame, text="Transfer Settings", padding=(10, 10))
+        left_frame.pack(side="left", fill="y", padx=10, pady=10)
+
+        label_frame = ttk.Frame(left_frame)
+        label_frame.pack(anchor="w", fill="x", pady=5)
+
+        description_label = ttk.Label(
+            label_frame,
+            text="Transfer Blender Settings",
+            font=("Segoe UI", 9, "bold")
+        )
+        description_label.pack(side="left", padx=5)
+
+        question_label = ttk.Label(
+            label_frame,
+            text="?",
+            font=("Arial", 9, "bold"),
+            foreground="blue", 
+            cursor="hand2"
+        )
+        question_label.pack(side="left", padx=5)
+        question_label.bind(
+            "<Button-1>",
+            lambda e: messagebox.showinfo("Info", "This section allows you to transfer settings and addons between Blender versions.")
+        )
+
+        ttk.Label(left_frame, text="Source Version:", font=("Segoe UI", 8)).pack(anchor="w", padx=5, pady=2)
+        self.source_version_var = tk.StringVar()
+        self.source_version_combobox = ttk.Combobox(
+            left_frame,
+            textvariable=self.source_version_var,
+            state="readonly",
+            width=25
+        )
+        self.source_version_combobox.pack(anchor="w", padx=5, pady=5)
+
+        ttk.Label(left_frame, text="↓", font=("Segoe UI", 10)).pack(anchor="center", pady=5)
+
+        ttk.Label(left_frame, text="Destination Version:", font=("Segoe UI", 8)).pack(anchor="w", padx=5, pady=2)
+        self.destination_version_var = tk.StringVar()
+        self.destination_version_combobox = ttk.Combobox(
+            left_frame,
+            textvariable=self.destination_version_var,
+            state="readonly",
+            width=25
+        )
+        self.destination_version_combobox.pack(anchor="w", padx=5, pady=5)
+
+        self.transfer_button = ttkb.Button(
+            left_frame,
+            text="Transfer Settings",
+            bootstyle="primary",
+            command=self.transfer_blender_settings
+        )
+        self.transfer_button.pack(anchor="w", pady=10)
+
+        self.populate_blender_versions()
 
 
 
@@ -3036,6 +3247,128 @@ For further details, please refer to the user manual or visit our support site."
 
         #----------------------------------Functions ---------------------------------------------------
         
+
+
+    def populate_blender_versions(self):
+        """Populate Blender versions in the comboboxes."""
+        base_dir = os.path.join(os.getenv("APPDATA"), "Blender Foundation", "Blender")
+        if not os.path.exists(base_dir):
+            messagebox.showwarning("Warning", "No Blender versions found.")
+            return
+
+        versions = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+        if versions:
+            self.source_version_combobox["values"] = versions
+            self.destination_version_combobox["values"] = versions
+        else:
+            messagebox.showwarning("Warning", "No Blender versions available.")
+
+
+
+
+
+
+    def transfer_blender_settings(self):
+        """Transfer config and script settings between Blender versions."""
+        source_version = self.source_version_var.get()
+        destination_version = self.destination_version_var.get()
+
+        if not source_version or not destination_version:
+            messagebox.showerror("Error", "Please select both source and destination versions.")
+            return
+
+        base_dir = os.path.join(os.getenv("APPDATA"), "Blender Foundation", "Blender")
+        source_path = os.path.join(base_dir, source_version)
+        destination_path = os.path.join(base_dir, destination_version)
+
+        if not os.path.exists(source_path):
+            messagebox.showerror("Error", f"Source version {source_version} does not exist.")
+            return
+        if not os.path.exists(destination_path):
+            messagebox.showerror("Error", f"Destination version {destination_version} does not exist.")
+            return
+
+        try:
+            source_config = os.path.join(source_path, "config")
+            destination_config = os.path.join(destination_path, "config")
+            if os.path.exists(source_config):
+                if os.path.exists(destination_config):
+                    shutil.rmtree(destination_config)
+                shutil.copytree(source_config, destination_config)
+
+            source_scripts = os.path.join(source_path, "scripts")
+            destination_scripts = os.path.join(destination_path, "scripts")
+            if os.path.exists(source_scripts):
+                if os.path.exists(destination_scripts):
+                    shutil.rmtree(destination_scripts)
+                shutil.copytree(source_scripts, destination_scripts)
+
+            messagebox.showinfo("Success", f"Settings transferred from {source_version} to {destination_version}.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to transfer settings: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+    def toggle_tab_visibility(self, tab_name, var):
+        """Toggle the visibility of a tab based on the boolean variable."""
+        if var.get():  
+            if tab_name == "Addon Management" and not hasattr(self, "plugins_tab"):
+                self.plugins_tab = ttkb.Frame(self.notebook)
+                self.notebook.add(self.plugins_tab, text="Addon Management")
+                self.create_plugins_tab()
+            elif tab_name == "Project Management" and not hasattr(self, "project_management_tab"):
+                self.project_management_tab = ttkb.Frame(self.notebook)
+                self.notebook.add(self.project_management_tab, text="Project Management")
+                self.create_project_management_tab()
+            elif tab_name == "Render Management" and not hasattr(self, "render_management_tab"):
+                self.render_management_tab = ttkb.Frame(self.notebook)
+                self.notebook.add(self.render_management_tab, text="Render Management")
+                self.create_render_management_tab()
+            elif tab_name == "Version Management" and not hasattr(self, "installed_tab"):
+                self.installed_tab = ttkb.Frame(self.notebook)
+                self.notebook.add(self.installed_tab, text="Version Management")
+                self.create_installed_tab()
+            elif tab_name == "Installation" and not hasattr(self, "install_tab"):
+                self.install_tab = ttkb.Frame(self.notebook)
+                self.notebook.add(self.install_tab, text="Installation")
+                self.create_install_tab()
+        else:  
+            for index in range(self.notebook.index("end")):
+                if self.notebook.tab(index, "text") == tab_name:
+                    self.notebook.forget(index)
+                    break
+
+
+        setting_key = f"show_{tab_name.replace(' ', '_').lower()}"
+        self.settings[setting_key] = var.get()
+        save_config(self.settings)
+
+    def toggle_bm_auto_update(self):
+        """Toggle the BM Auto Update setting and save it to the config."""
+        self.settings["bm_auto_update_checkbox"] = self.bm_auto_update_var.get()
+        save_config(self.settings)
+        print(f"BM Auto Update set to: {self.bm_auto_update_var.get()}")
+
+
+    def restart_application(self):
+        """Restart the application."""
+        try:
+            python = sys.executable  
+            os.execl(python, python, *sys.argv)  
+        except Exception as e:
+            messagebox.showerror("Restart Error", f"Failed to restart application: {e}")
+
+
+
 
 
 
@@ -3479,24 +3812,20 @@ For further details, please refer to the user manual or visit our support site."
                     scripts_addons_path = os.path.join(blender_foundation_path, folder, "scripts", "addons")
                     os.makedirs(scripts_addons_path, exist_ok=True)
 
-                    addon_full_path = None
-                    for name in addon_folder_names:
-                        potential_path = os.path.join(scripts_addons_path, name)
-                        if os.path.exists(potential_path):
-                            print(f"Addon already exists in: {potential_path}, skipping installation.")
-                            addon_full_path = potential_path
-                            break
+                    addon_folder_name = addon_folder_names[0]  
+                    addon_full_path = os.path.join(scripts_addons_path, addon_folder_name)
 
-                    if not addon_full_path:
-                        addon_folder_name = addon_folder_names[0] 
-                        addon_full_path = os.path.join(scripts_addons_path, addon_folder_name)
+                    if os.path.exists(addon_full_path):
+                        print(f"Addon already exists in: {addon_full_path}. Removing old version.")
+                        shutil.rmtree(addon_full_path) 
 
-                        self.unzip_addon(self.addon_zip_path, scripts_addons_path)
-                        print(f"Addon installed in: {scripts_addons_path}")
+                    self.unzip_addon(self.addon_zip_path, scripts_addons_path)
+                    print(f"Addon installed in: {scripts_addons_path}")
 
             messagebox.showinfo("Setup Complete", "Addon has been installed successfully in all Blender versions.")
         else:
             messagebox.showerror("Error", "Blender Foundation folder not found. You need to install Blender first.")
+
 
 
 
@@ -3637,6 +3966,30 @@ For further details, please refer to the user manual or visit our support site."
             padding= (5, 2)
         )
 
+
+        self.style.configure(
+            'Small.TButton',
+            font=(button_font_family, 8),  
+            padding=(2, 1),  
+            background='#ff4d4d',
+            foreground='white',
+            borderwidth=0
+        )
+
+
+
+       
+        self.style.configure(
+            'Unique.TButton',
+            font=("Arial", 8),  
+            padding=(2, 1),  
+            borderwidth=1,
+            relief="flat",
+            background="#e1e1e1", 
+            foreground="#000000"  
+        )
+
+
         self.style.configure(
             'Green.TButton',
             font=(button_font_family, button_font_size),
@@ -3713,7 +4066,6 @@ For further details, please refer to the user manual or visit our support site."
         plugins_frame = ttk.Frame(self.plugins_tab, padding=(10, 10, 10, 10))
         plugins_frame.pack(expand=1, fill='both')
 
-        # Directory Selector and Entry
         self.directory_path = tk.StringVar(value=self.load_plugin_directory())
         directory_frame = ttk.Frame(plugins_frame)
         directory_frame.pack(anchor='w', padx=10, pady=(0, 5))
@@ -3756,7 +4108,6 @@ For further details, please refer to the user manual or visit our support site."
         )
         self.refresh_plugins_button.pack(side='left', padx=(0, 5))
 
-        # Search Bar Entry
         self.plugin_search_var = tk.StringVar()
         self.plugin_search_var.trace("w", lambda *args: self.on_plugin_search_change())
 
@@ -3818,21 +4169,18 @@ For further details, please refer to the user manual or visit our support site."
         self.plugins_tree.drop_target_register(DND_FILES)
         self.plugins_tree.dnd_bind('<<Drop>>', self.handle_treeview_drop)
 
-        # Add Context Menu for Plugins
         self.plugin_context_menu = tk.Menu(self.plugins_tree, tearoff=0)
         self.plugin_context_menu.add_command(label="Delete", command=self.remove_plugin)
         self.plugin_context_menu.add_command(label="Info", command=self.view_plugin_content)
         self.plugin_context_menu.add_command(label="View Documentation", command=self.view_plugin_document)
         self.duplicate_menu = tk.Menu(self.plugin_context_menu, tearoff=0)
         self.plugin_context_menu.add_cascade(label="Duplicate to...", menu=self.duplicate_menu)
-        # Bind Right-Click to Plugins Treeview
         self.plugins_tree.bind("<Button-3>", self.show_plugin_context_menu)
 
         self.refresh_plugins_list()
 
     def show_plugin_context_menu(self, event):
         """Displays the context menu for the selected plugin."""
-        # Select the item under right-click
         item_id = self.plugins_tree.identify_row(event.y)
         if item_id:
             self.plugins_tree.selection_set(item_id)
@@ -3843,16 +4191,14 @@ For further details, please refer to the user manual or visit our support site."
         selected_item = self.plugins_tree.selection()
         if selected_item:
             plugin_name = self.plugins_tree.item(selected_item, "values")[0]
-            # Confirm and delete logic here
             print(f"Deleting plugin: {plugin_name}")
-            self.plugins_tree.delete(selected_item)  # Simulate deletion
+            self.plugins_tree.delete(selected_item) 
 
     def show_plugin_info(self):
         """Shows information about the selected plugin."""
         selected_item = self.plugins_tree.selection()
         if selected_item:
             plugin_info = self.plugins_tree.item(selected_item, "values")
-            # Show plugin info logic here (e.g., open a popup or print info)
             print(f"Plugin Info: {plugin_info}")
 
         
@@ -3881,11 +4227,10 @@ For further details, please refer to the user manual or visit our support site."
 
     def show_plugin_context_menu(self, event):
         """Displays the context menu for the selected plugin."""
-        # Select the item under right-click
         item_id = self.plugins_tree.identify_row(event.y)
         if item_id:
             self.plugins_tree.selection_set(item_id)
-            self.update_duplicate_menu()  # Update submenu before showing context menu
+            self.update_duplicate_menu()  
             self.plugin_context_menu.tk_popup(event.x_root, event.y_root)
 
     def duplicate_addon_to_version(self, target_version):
@@ -3895,7 +4240,6 @@ For further details, please refer to the user manual or visit our support site."
             messagebox.showerror("Error", "No addon selected.")
             return
 
-        # Get the selected addon name and path
         addon_name = self.plugins_tree.item(selected_item, "values")[0]
         current_addon_path = os.path.join(self.directory_path.get(), addon_name)
 
@@ -3903,7 +4247,6 @@ For further details, please refer to the user manual or visit our support site."
             messagebox.showerror("Error", "The selected addon does not exist.")
             return
 
-        # Construct the target addon directory path
         target_addon_path = os.path.join(
             os.getenv('APPDATA'),
             "Blender Foundation",
@@ -4754,7 +5097,10 @@ For further details, please refer to the user manual or visit our support site."
             "Enter export format (fbx, gltf, abc):",
             initialvalue="fbx"
         )
+        if not export_format:
+            return
 
+        export_format = export_format.lower()
         if export_format not in ['fbx', 'obj', 'gltf', 'ply', 'stl', 'abc']:
             messagebox.showerror("Error", "Invalid export format.")
             return
@@ -4770,8 +5116,19 @@ For further details, please refer to the user manual or visit our support site."
         if not os.path.exists(blender_path):
             messagebox.showerror("Error", f"Blender executable not found at: {blender_path}")
             return
+
         self.show_exporting_message()
-        threading.Thread(target=self.run_export_process, args=(blend_path, output_path, export_format, blender_path)).start()
+        threading.Thread(
+            target=self.run_export_process,
+            args=(blend_path, output_path, export_format, blender_path),
+            daemon=True
+        ).start()
+
+
+
+
+
+
 
     def run_export_process(self, blend_path, output_path, export_format, blender_path):
         """Run the export process in a separate thread."""
@@ -4786,6 +5143,10 @@ import bpy
 bpy.ops.wm.open_mainfile(filepath=r'{blend_path}')
 
 if '{export_format}' == 'fbx':
+    for obj in bpy.data.objects:
+        if obj.type == 'LIGHT':
+            bpy.data.objects.remove(obj, do_unlink=True)
+
     bpy.ops.export_scene.fbx(
         filepath=r'{output_path}',
         use_selection=False,
@@ -4796,7 +5157,7 @@ if '{export_format}' == 'fbx':
         mesh_smooth_type='FACE',
         use_tspace=True,
         use_mesh_modifiers=True,
-        use_triangles=True 
+        use_triangles=True
     )
 elif '{export_format}' == 'gltf':
     bpy.ops.export_scene.gltf(
@@ -5838,8 +6199,8 @@ elif '{export_format}' == 'abc':
         self.release_notes_btn.config(state='disabled')  
         
         self.tree = ttkb.Treeview(right_frame, columns=("Version", "Release Date"), show="headings", height=20, style="Custom.Treeview")
-        self.tree.heading("Version", text="Blender Version")
-        self.tree.heading("Release Date", text="Release Date")
+        self.tree.heading("Version", text="Blender Version", command=lambda: self.sort_treeview_column_installation_tab("Version"))
+        self.tree.heading("Release Date", text="Release Date", command=lambda: self.sort_treeview_column_installation_tab("Release Date"))
         self.tree.column("Version", anchor="center")
         self.tree.column("Release Date", anchor="center")
         self.tree.pack(expand=True, fill="both")
@@ -5850,8 +6211,37 @@ elif '{export_format}' == 'abc':
 
     # ----Functions----
     
+
+
+    def sort_treeview_column_installation_tab(self, column_name):
+        """Sort the Treeview by the given column, prioritizing Year > Month > Day > Time."""
+        data = [(self.tree.set(item, column_name), item) for item in self.tree.get_children("")]
+
+        if column_name == "Release Date":
+            def parse_date(date_str):
+                try:
+                    parsed_date = datetime.strptime(date_str, "%d-%b-%Y %H:%M")
+                    return (parsed_date.year, parsed_date.month, parsed_date.day, parsed_date.hour, parsed_date.minute)
+                except ValueError:
+                    return (0, 0, 0, 0, 0)  
+
+            data.sort(key=lambda x: parse_date(x[0]))
+        else:
+            data.sort(key=lambda x: x[0])
+
+        is_currently_sorted_ascending = getattr(self, f"{column_name}_sorted_ascending", True)
+        if not is_currently_sorted_ascending:
+            data.reverse()
+
+        for index, (_, item) in enumerate(data):
+            self.tree.move(item, '', index)
+
+        setattr(self, f"{column_name}_sorted_ascending", not is_currently_sorted_ascending)
+
+
+
+
     def on_treeview_select_install_tab(self, event):
-        """TreeView'de bir öğe seçildiğinde Release Notes butonunu etkinleştir."""
         selected_item = self.tree.focus()
         if selected_item:
             self.release_notes_btn.config(state='normal')
@@ -6470,7 +6860,7 @@ if __name__ == "__main__":
     multiprocessing.freeze_support()
 
     try:
-        app = BlenderManagerApp()  
+        app = BlenderManagerApp()
         app.mainloop()
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}\n"
