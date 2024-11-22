@@ -1,50 +1,82 @@
 ﻿# -*- coding: utf-8 -*-
+
 import time
-start_time = time.time()
 import os
+
+
+
+
+
+def get_blender_config_path():
+    """Determine Blender configuration path based on the operating system."""
+    import platform
+    system = platform.system()
+    if system == "Windows":
+        appdata = os.getenv("APPDATA")
+        if appdata:
+            return os.path.join(appdata, "Blender Foundation", "Blender")
+        else:
+            raise EnvironmentError("APPDATA environment variable is not set.")
+    elif system == "Darwin":  # MacOS
+        paths_to_check = [
+            os.path.expanduser("~/Library/Application Support/Blender"),
+            "/Applications/Blender.app/Contents/Resources/config",
+            os.path.expanduser("~/.blender")  
+        ]
+        
+        for path in paths_to_check:
+            if os.path.exists(path):
+                return path
+
+        raise EnvironmentError("Blender configuration path not found on MacOS.")
+
+    elif system == "Linux":
+
+        paths_to_check = [
+            os.path.expanduser("~/.config/blender"),
+            os.path.expanduser("~/.blender"),  
+            "/usr/share/blender/config"  
+        ]
+
+        for path in paths_to_check:
+            if os.path.exists(path):
+                return path
+
+        raise EnvironmentError("Blender configuration path not found on Linux.")
+
+    else:
+        raise EnvironmentError(f"Unsupported operating system: {system}")
+
+
+
+
+
+
 import sys
-import locale
-import asyncio
-import aiohttp
-import pystray
-import ctypes
-from PIL import Image, ImageTk
-try:
-    locale.setlocale(locale.LC_ALL, "en_US.UTF-8") 
-except locale.Error:
-    locale.setlocale(locale.LC_ALL, "C")     
-import tarfile
-from datetime import datetime
-import shutil
-import subprocess
-import requests
-import zipfile
-import ast
-from bs4 import BeautifulSoup
-import threading
-import queue 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import tkinter.simpledialog as simpledialog
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import ttkbootstrap as ttkb
 from ttkbootstrap.constants import *
+import pystray
+import tarfile
+from datetime import datetime
+import shutil
+import subprocess
+import zipfile 
+import threading
+import queue 
 import json
 import re
 import multiprocessing
-import traceback
 import tempfile
-import ast 
-import certifi
-import ssl
-import psutil
+import platform
 
-end_time = time.time()
-print(f"imports loaded in {end_time - start_time}.") 
+
 CONFIG_FILE_PATH = os.path.join(os.path.expanduser("~"), ".BlenderManager", "config.json")
-
 DEFAULT_SETTINGS = {
-    "version": "0.0.6",
+    "version": "0.0.7",
     "selected_theme": "darkly",
     "auto_update_checkbox": True,
     "bm_auto_update_checkbox": False,
@@ -129,29 +161,53 @@ class Redirector:
     def flush(self):
         pass
 
-
+ 
 class BlenderManagerApp(TkinterDnD.Tk):
     
     def __init__(self):
         
         super().__init__()
         
-        start_time = time.time()
+       
         self.tray_name = "Blender Manager"
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.check_existing_window_and_tray()
-        self.title("Blender Manager")     
-        self.geometry("900x600")
-        threading.Thread(target=self.initialize_app, daemon=True).start()
-        self.iconbitmap(r"Assets/Images/bmng.ico")
+        self.title("Blender Manager")  
+        self.geometry("900x600")              
         self.minsize(900, 600)
         self.maxsize(1920, 1080)
+        self.style = ttkb.Style() 
+        self.load_settings_on_begining()
+        self.iconbitmap(r"Assets/Images/bmng.ico")
+        self.attributes('-fullscreen', False) 
+        self.load_settings_on_begining()
+        self.schedule_tray_icon_creation()
         self.after(100, self.check_queue)
         self.base_install_dir = os.path.join(os.path.expanduser("~"), '.BlenderManager')
         self.blender_install_dir = os.path.join(self.base_install_dir, 'blender')
         self.style = ttkb.Style() 
-        self.load_settings_on_begining()
-
         self.current_folder = self.get_render_folder_path()      
+        
+
+
+
+
+
+
+
+
+        def load_heavy_components(self):
+            self.create_widgets()
+            self.notes_data = self._load_notes()
+            self.menu_cache = {}
+            self.load_menu_cache()
+            self.redirect_output()
+
+            with open(BASE_MESH_PATH, 'r') as file:
+                self.base_meshes = json.load(file)
+
+
+
         self.theme_choice = tk.StringVar(value=self.style.theme_use())  
         self.available_themes = {
             'Solar': 'solar',
@@ -174,39 +230,82 @@ class BlenderManagerApp(TkinterDnD.Tk):
             'Yeti': 'yeti',
             'Zephyr': 'zephyr'
         }
-
+        threading.Thread(target=load_heavy_components, args=(self,), daemon=True).start()
         self.is_installing = False
         self.cancel_event_main = threading.Event() 
         self.cancel_event = threading.Event()
         self.cancel_event_install = threading.Event()
         self.queue = queue.Queue()
-        self.create_widgets()
+        
         self.check_queue()
+
+
         
-        self.notes_data = self._load_notes()
-        self.current_render_name = None     
-        self.menu_cache = {}  
-        self.load_menu_cache()  
-        self.create_main_menu()
-        self.redirect_output()
-        self.start_time = time.time() 
+
+
+
+
         
-        with open(BASE_MESH_PATH, 'r') as file:
-            base_meshes = json.load(file)
-        self.base_meshes = base_meshes  
-        self.base_mesh_var = tk.StringVar()
-        self.new_base_mesh_name = tk.StringVar()
-        self.new_base_mesh_path = tk.StringVar()
-        self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        self.tray_icon = None
-        self.create_tray_icon()
-        self.attributes('-fullscreen', False)  
-        end_time = time.time()
-        print(f"Blender Manager initialized in {end_time - start_time}.")  
+     
+        
+    def get_blender_executable_path(self):
+        """
+        Determine the path to the Blender executable based on the operating system.
+        If the executable is not found, prompt the user to install Blender.
+        Returns:
+            str: Full path to the Blender executable, or None if not found and user cancels installation.
+        """
+        import platform
+        import os
+
+        system = platform.system()
+        base_blender_dir = os.path.join(os.path.expanduser("~"), ".BlenderManager", "blender")
+
+        if system == "Windows":
+            blender_exe = os.path.join(base_blender_dir, "blender.exe")
+        elif system == "Darwin":  # macOS
+            blender_exe = os.path.join(base_blender_dir, "Blender.app", "Contents", "MacOS", "Blender")
+        elif system == "Linux":
+            blender_exe = os.path.join(base_blender_dir, "blender")
+        else:
+            print(f"Unsupported operating system: {system}")
+            return None
+
+        if os.path.isfile(blender_exe):
+            return blender_exe
+        else:
+            print(f"Blender executable not found at expected path: {blender_exe}")
+            self.show_install_dialog()
+            return None
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 #------------------------UPDATE CONTROL-----------------------------------------------
+
+    def schedule_tray_icon_creation(self):
+        """Schedules the creation of the tray icon after a 5-second delay."""
+        self.after(5000, self.create_tray_icon)  
+
+
+
+
+
+
+
+
+        
     def bm_show_loading_screen(self):
         """Show a loading screen during the update process."""
         self.loading_window = tk.Toplevel(self)
@@ -294,6 +393,8 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
 
     def bm_get_latest_version(self):
+        import requests
+
         """Fetch the latest version from GitHub releases."""
         url = "https://github.com/verlorengest/BlenderManager/releases"
         try:
@@ -321,21 +422,34 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.withdraw()
         
     def bm_download_and_install_update(self, version):
-        """Download and install the new version of Blender Manager with feedback."""
+        """
+        Download and install the new version of Blender Manager with feedback.
+        Supports MacOS updates with .dmg handling.
+        """
         import platform
+        import requests
 
-        download_url = f"https://github.com/verlorengest/BlenderManager/releases/download/v{version}/blender_manager_v{version}.zip"
+
+
+        current_os = platform.system().lower()
+        if current_os == 'darwin': 
+            download_url = f"https://github.com/verlorengest/BlenderManager/releases/download/v{version}/blender_manager_v{version}.dmg"
+        else:  
+            download_url = f"https://github.com/verlorengest/BlenderManager/releases/download/v{version}/blender_manager_v{version}.zip"
+
         temp_dir = tempfile.mkdtemp()
-        zip_path = os.path.join(temp_dir, "update.zip")
+        file_name = os.path.basename(download_url)
+        file_path = os.path.join(temp_dir, file_name)
 
         try:
             self.bm_show_loading_screen()
 
             response = requests.get(download_url, stream=True)
+            response.raise_for_status()  
             total_size = int(response.headers.get('content-length', 0))
             downloaded_size = 0
 
-            with open(zip_path, 'wb') as file:
+            with open(file_path, 'wb') as file:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         file.write(chunk)
@@ -344,20 +458,14 @@ class BlenderManagerApp(TkinterDnD.Tk):
                         self.loading_progress_var.set(progress)
                         self.loading_window.update_idletasks()
 
-            extract_dir = os.path.join(temp_dir, "extracted")
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
-
-            current_os = platform.system().lower()
-
             if current_os == 'windows':
-                script_path = self.create_windows_update_script(extract_dir)
-            elif current_os == 'darwin':  # macOS
-                script_path = self.create_macos_update_script(extract_dir)
+                script_path = self.create_windows_update_script(file_path)
+            elif current_os == 'darwin':  
+                script_path = self.create_macos_update_script(file_path)
             elif current_os == 'linux':
-                script_path = self.create_linux_update_script(extract_dir)
+                script_path = self.create_linux_update_script(file_path)
             else:
-                messagebox.showerror("Update Error", "Unsupported operating system. Please install manually.")
+                messagebox.showerror("Update Error", "Unsupported operating system.")
                 self.bm_close_loading_screen()
                 return
 
@@ -368,14 +476,14 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
         except Exception as e:
             self.bm_close_loading_screen()
-            messagebox.showerror("Update Error", f"Failed to install update: {e} Please install manually.")
+            messagebox.showerror("Update Error", f"Failed to install update: {e}")
         finally:
             shutil.rmtree(temp_dir)
 
 
 
     def create_windows_update_script(self, extract_dir):
-        """Update function for Windows"""
+        """update function for Windows"""
         script_path = os.path.join(extract_dir, "update.bat")
         executable_path = os.path.join(os.getcwd(), "blender_manager.exe")
 
@@ -396,8 +504,7 @@ set "destination={os.path.dirname(executable_path)}"
 
 xcopy /s /e /y "%source%\\*" "%destination%"
 if %errorlevel% neq 0 (
-    echo Update failed. Unable to copy files. Please install manually.
-    powershell -Command "Add-Type -AssemblyName PresentationFramework; $result = [System.Windows.MessageBox]::Show('Update failed. Unable to copy files. Please install manually.', 'Update Error', 'OK', 'Error'); if ($result -eq 'OK') {{ Start-Process 'https://yourwebsite.com/manual-update' }}"
+    echo Update failed. Unable to copy files.
     exit /b 1
 )
 
@@ -408,6 +515,18 @@ exit
             """)
 
         return script_path
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -488,24 +607,29 @@ exit 0
 
 
     def initialize_app(self):
-        """Initializing the application."""
-        print("Initializing app...")
+        """Initialize the application."""
+        print("Initializing app in thread:", threading.current_thread().name)
+        self.task_queue = queue.Queue()  
 
         def background_task():
             """Runs heavy initialization tasks in a background thread."""
+            print("Background task running in thread:", threading.current_thread().name)
+
+
             try:
                 setup_complete_file = os.path.join(os.path.expanduser("~"), ".BlenderManager", "setup_complete")
                 if os.path.exists(setup_complete_file):
                     print("Setup already complete. Skipping initialization.")
-                    return  
+                    self.task_queue.put(self.finalize_initialization)
+                    return
 
                 base_dir = BLENDER_MANAGER_DIR
                 if not os.path.exists(base_dir):
                     os.makedirs(base_dir)
 
                 required_dirs = [
-                    "BaseMeshes", "BlenderVersions", "mngaddon",
-                    "paths", "Projects", "renders"
+                    "BlenderVersions", "mngaddon",
+                    "paths"
                 ]
                 for dir_name in required_dirs:
                     dir_path = os.path.join(base_dir, dir_name)
@@ -515,7 +639,7 @@ exit 0
                 paths_dir = os.path.join(base_dir, "paths")
                 json_files = [
                     "base_mesh_path.json",
-                    "project_directory.json", 
+                    "project_directory.json",
                     "render_notes.json",
                     "renderfolderpath.json"
                 ]
@@ -523,16 +647,33 @@ exit 0
                     file_path = os.path.join(paths_dir, json_file)
                     if not os.path.exists(file_path):
                         with open(file_path, 'w') as file:
-                            json.dump({}, file) 
+                            json.dump({}, file)
 
                 with open(setup_complete_file, 'w') as file:
                     file.write("Setup complete.")
             finally:
                 print("Initialization complete.")
-                self.after(0, self.show_window)
-                self.after(0, self.deiconify)
+                self.task_queue.put(self.finalize_initialization) 
 
         threading.Thread(target=background_task, daemon=True).start()
+
+        self.check_task_queue()
+
+    def check_task_queue(self):
+        """Periodically checks the task queue and executes tasks in the main thread."""
+        try:
+            while not self.task_queue.empty():
+                task = self.task_queue.get_nowait() 
+                task()  
+        except queue.Empty:
+            pass
+        self.after(100, self.check_task_queue)  
+
+    def finalize_initialization(self):
+        """Finalize the initialization by showing the main window."""
+        print("Finalizing initialization...")
+        self.deiconify()  
+        self.show_window()  
 
 
     def load_menu_cache(self):
@@ -542,6 +683,7 @@ exit 0
             self.menu_cache['plugins'] = self.refresh_plugins_list()
             self.menu_cache['projects'] = self.refresh_projects_list()
             self.menu_cache['installed_versions'] = self.get_installed_versions()
+
         except Exception as e:
             print(f"Error Loading: {e}")
                     
@@ -603,25 +745,37 @@ exit 0
     def create_widgets(self):
         """Create the GUI layout."""
         main_frame = ttkb.Frame(self, padding=(20, 20, 20, 20))
-        main_frame.pack(expand=1, fill='both')
-
+        main_frame.pack(expand=1, fill="both")
+        start_time = time.time()
         self.style.configure("TNotebook.Tab", font=(self.button_font_family, 10))
         self.notebook = ttkb.Notebook(main_frame)
-        self.notebook.pack(expand=1, fill='both')
+        self.notebook.pack(expand=1, fill="both")
 
         self.main_menu_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.main_menu_tab, text="Main Menu")
         self.create_main_menu()
+        print(f"Main menu loaded in {time.time() - start_time:.2f} seconds.")
 
+        threads = []
         for tab_name, is_visible in self.tab_visibility_settings.items():
             if is_visible:
-                self.toggle_tab_visibility(tab_name, tk.BooleanVar(value=True))
+                thread = threading.Thread(
+                    target=self.toggle_tab_visibility_thread_safe,
+                    args=(tab_name, tk.BooleanVar(value=True)),  
+                    daemon=True
+                )
+                thread.start()
+                threads.append(thread)
+
+        for thread in threads:
+            thread.join()
 
 
         self.logs_tab = ttkb.Frame(self.notebook)
         self.notebook.add(self.logs_tab, text="Logs")
         self.create_logs_tab()
 
+        print(f"All tabs loaded in {time.time() - start_time:.2f} seconds.")
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -630,6 +784,18 @@ exit 0
 
         self.current_version = self.bm_load_current_version()
         self.latest_version = None
+        threading.Thread(target=self.after_widget_check_bm_updates, daemon=True).start()
+
+
+    def toggle_tab_visibility_thread_safe(self, tab_name, var):
+        """Wrapper to call toggle_tab_visibility in a thread-safe manner."""
+        self.after(0, lambda: self.toggle_tab_visibility(tab_name, var))
+
+
+
+
+    def after_widget_check_bm_updates(self):
+        """Check for updates in a background thread."""
         if self.settings.get("bm_auto_update_checkbox", True):
             print("Checking Blender Manager updates...")
             self.bm_check_for_updates_threaded()
@@ -641,7 +807,9 @@ exit 0
             print(f"Auto Update: {self.auto_update_var.get()}")
 
 
+
     def is_tray_icon_running(self):
+        import psutil
         """Check if a tray application with the given name is running."""
         try:
             for process in psutil.process_iter(attrs=['name']):
@@ -656,6 +824,8 @@ exit 0
 
 
     def find_window_with_tray_name(self, tray_name):
+        import ctypes
+
         """Find a tray window with the specified name."""
         def enum_windows_callback(hwnd, lParam):
             length = ctypes.windll.user32.GetWindowTextLengthW(hwnd)
@@ -674,19 +844,45 @@ exit 0
 
     def bring_window_to_front(self, hwnd=None):
         """Bring the application's window or tray to the front."""
+        
+        import platform
+
         try:
-            if hwnd:
-                ctypes.windll.user32.ShowWindow(hwnd, 9)  
-                ctypes.windll.user32.SetForegroundWindow(hwnd)
-            else:
-                hwnd = ctypes.windll.user32.FindWindowW(None, self.tray_name)
+            
+            if platform.system() == "Windows":
+                import win32gui
+                import win32con
+
                 if hwnd:
-                    ctypes.windll.user32.ShowWindow(hwnd, 9)
-                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                    win32gui.SetForegroundWindow(hwnd)
+                else:
+                    hwnd = win32gui.FindWindow(None, self.tray_name)
+                    if hwnd:
+                        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                        win32gui.SetForegroundWindow(hwnd)
+                    else:
+                        print("Window not found.")
+            else:
+                if platform.system() == "Darwin":  # MacOS
+                    from AppKit import NSApplication, NSRunningApplication, NSApplicationActivateIgnoringOtherApps
+                    from Foundation import NSBundle
+
+                    bundle = NSBundle.mainBundle()
+                    app = NSRunningApplication.runningApplicationWithProcessIdentifier_(os.getpid())
+                    app.activateWithOptions_(NSApplicationActivateIgnoringOtherApps)
+                    print("Window brought to front on macOS.")
+                else:
+                    print("Bringing window to front is not supported on this platform.")
         except Exception as e:
             print(f"Error bringing window to front: {e}")
 
+
+
+
+
     def check_existing_window_and_tray(self):
+        import psutil
         try:
             current_pid = os.getpid()
             current_path = os.path.realpath(sys.argv[0])
@@ -728,7 +924,7 @@ exit 0
         
 
     def create_tray_icon(self):
-        
+        from PIL import Image, ImageTk
         image = Image.open(r"Assets/Images/bmng.ico")
         self.tray_icon = pystray.Icon("BlenderManager", image, "Blender Manager", self.create_tray_menu())
         self.tray_icon.run_detached()
@@ -799,7 +995,9 @@ exit 0
         os._exit(0)
 
     def show_window(self):
-        self.bring_window_to_front()
+        self.deiconify()
+
+
 
 
 #-------------------------------------------------------------------------------------------------------
@@ -935,11 +1133,14 @@ exit 0
 
 
     def refresh_render_list(self):
+        from PIL import Image, ImageTk
         """Refresh the Render List by reloading the current directory files."""
         if hasattr(self, 'current_folder') and self.current_folder:
             self.render_tree.delete(*self.render_tree.get_children())
             self.render_file_paths.clear()
 
+            if not os.path.exists(self.current_folder):
+                os.makedirs(self.current_folder, exist_ok=True)
             for file_name in os.listdir(self.current_folder):
                 file_path = os.path.join(self.current_folder, file_name)
 
@@ -1024,6 +1225,7 @@ exit 0
             
 
     def browse_render_directory(self):
+        from PIL import Image, ImageTk
         """Open a dialog to select a folder and display only PNG, JPEG, JPG, and MP4 files in the Render List."""
         folder_path = filedialog.askdirectory(initialdir=APPDATA_RENDER_PATH, title="Select Render Folder")
         if not folder_path:
@@ -1129,6 +1331,7 @@ exit 0
 
 
     def display_image_preview(self, file_path):
+        from PIL import Image, ImageTk
         """Display the selected image in the Render Preview section."""
         try:
             img = Image.open(file_path)
@@ -1468,7 +1671,6 @@ exit 0
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
 
-        # projects_frame expands within main_menu_frame
         projects_frame.grid_columnconfigure(0, weight=1)
         projects_frame.grid_rowconfigure(0, weight=1)
 
@@ -1482,7 +1684,7 @@ exit 0
         self.recent_projects_tree.bind("<Double-1>", self.on_project_double_click)
 
         spacer_frame = ttkb.Frame(buttons_frame, height=20)
-        spacer_frame.grid(row=10, column=0, pady=(180, 0))  # Adds space below buttons
+        spacer_frame.grid(row=10, column=0, pady=(180, 0))  
 
 
         self.bm_version_label = ttkb.Label(
@@ -1491,7 +1693,7 @@ exit 0
             style='Custom.Large.TLabel',
             font=(self.button_font_family, 8)
         )
-        self.bm_version_label.grid(row=11, column=0, sticky="s", padx=(10, 0), pady=(10, 5))  # Properly spaced at the bottom
+        self.bm_version_label.grid(row=11, column=0, sticky="s", padx=(10, 0), pady=(10, 5))  
 
         self.update_bm_version_label()
 
@@ -2110,9 +2312,15 @@ For further details, please refer to the user manual or visit our support site."
 
     def load_recent_projects(self):
         """Loads recent projects from Blender's recent-files.txt for the detected Blender version."""
-        blender_foundation_path = os.path.join(os.getenv('APPDATA'), "Blender Foundation", "Blender")
+
+
+        start_time = time.time()
+        blender_foundation_path = get_blender_config_path()
         blender_version = self.get_blender_folder()
-    
+
+        if platform.system() == "Darwin" and blender_version and len(blender_version.split(".")) == 3:
+            blender_version = ".".join(blender_version.split(".")[:2])
+
         if not blender_version:
             print("No Blender version detected for loading recent files.")
             return []
@@ -2134,38 +2342,57 @@ For further details, please refer to the user manual or visit our support site."
                         last_opened = datetime.fromtimestamp(os.path.getmtime(project_path)).strftime('%Y-%m-%d')
                         recent_projects.append((project_name, last_opened, project_path))
                     else:
-                        print(f"Project file not found, skipping: {project_path}")          
+                        print(f"Project file not found, skipping: {project_path}")
         except Exception as e:
             print(f"Error loading recent projects: {e}")
-
+        end_time = time.time()
+        print(f"Recent Projects Loaded in {end_time - start_time:.2f} seconds.")
         return recent_projects
 
 
 
 
     def get_blender_folder(self):
-        """Finds the latest Blender version from folders in the Blendermanager/blender directory."""
-        blender_base_path = os.path.join(os.path.expanduser("~"), ".BlenderManager", "blender")
+        """
+        Finds the latest Blender version installed in .BlenderManager/blender directory.
+        On macOS, uses the get_installed_blender_version method to retrieve the version if necessary.
+        """
+        import re
+        import platform
 
+        blender_base_path = os.path.join(os.path.expanduser("~"), ".BlenderManager", "blender")
         latest_version = None
 
-        if os.path.exists(blender_base_path):
-            for entry in os.listdir(blender_base_path):
-                entry_path = os.path.join(blender_base_path, entry)
-                if os.path.isdir(entry_path):
-                    match = re.match(r"(\d+\.\d+)", entry)
-                    if match:
-                        folder_version = match.group(1)
-                        if not latest_version or list(map(int, folder_version.split('.'))) > list(map(int, latest_version.split('.'))):
-                            latest_version = folder_version
-                            print(f"Blender version detected from folder: {latest_version}")
-        else:
+        if not os.path.exists(blender_base_path):
             print("Blender directory not found.")
+            return None
+
+        system = platform.system()
+
+        if system == "Darwin":  # macOS
+            print("Using get_installed_blender_version for macOS.")
+            installed_version = self.get_installed_blender_version()
+            if installed_version:
+                print(f"Installed Blender version detected: {installed_version}")
+                return installed_version
+            else:
+                print("Failed to detect installed Blender version on macOS.")
+
+        for entry in os.listdir(blender_base_path):
+            entry_path = os.path.join(blender_base_path, entry)
+
+            if os.path.isdir(entry_path):
+                match = re.match(r"(\d+\.\d+)", entry) 
+                if match:
+                    folder_version = match.group(1)
+                    if not latest_version or list(map(int, folder_version.split('.'))) > list(map(int, latest_version.split('.'))):
+                        latest_version = folder_version
+                        print(f"Detected Blender version from folder: {latest_version}")
 
         if latest_version:
-            print(f"Blender version for recent files: {latest_version}")
+            print(f"Latest Blender version detected: {latest_version}")
         else:
-            print("No Blender version detected in .Blendermanager/blender directory.")
+            print("No Blender version detected.")
 
         return latest_version
 
@@ -2173,9 +2400,24 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
+
     def get_latest_blender_version(self):
+        from bs4 import BeautifulSoup
+        import requests
+        import platform
+        import re
+
         """Finds the latest Blender version in X.Y.Z format from the release page."""
         base_url = "https://download.blender.org/release/"
+
+        def get_macos_architecture():
+            machine = platform.machine()
+            if machine == "arm64":
+                return "macos-arm64.dmg" 
+            elif machine == "x86_64":
+                return "macos-x64.dmg"  
+            return None
+
         try:
             response = requests.get(base_url, timeout=10)
             response.raise_for_status()
@@ -2203,10 +2445,24 @@ For further details, please refer to the user manual or visit our support site."
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 
+            system = platform.system()
+            if system == "Windows":
+                file_suffix = "windows-x64.zip"
+            elif system == "Darwin":  
+                file_suffix = get_macos_architecture()
+                if not file_suffix:
+                    print("Unsupported MacOS architecture.")
+                    messagebox.showerror("Unsupported System", "Your Mac architecture is not supported.")
+                    return None, None
+            else:
+                print(f"Unsupported operating system: {system}")
+                messagebox.showerror("Unsupported System", "Your operating system is not supported.")
+                return None, None
+
             minor_versions = []
             for link in soup.find_all('a', href=True):
                 href = link['href'].strip('/')
-                match = re.match(r'blender-(\d+)\.(\d+)\.(\d+)-windows-x64\.zip', href)
+                match = re.match(rf'blender-(\d+)\.(\d+)\.(\d+)-{file_suffix}', href)
                 if match and int(match.group(1)) == x and int(match.group(2)) == y:
                     z_version = int(match.group(3))
                     minor_versions.append(z_version)
@@ -2218,7 +2474,7 @@ For further details, please refer to the user manual or visit our support site."
 
             latest_minor_version = max(minor_versions)
             version_number = f"{x}.{y}.{latest_minor_version}"
-            download_url = f"{major_version_url}blender-{version_number}-windows-x64.zip"
+            download_url = f"{major_version_url}blender-{version_number}-{file_suffix}"
 
             return version_number, download_url
 
@@ -2229,70 +2485,118 @@ For further details, please refer to the user manual or visit our support site."
 
 
     def download_blender_zip(self, download_url):
-        """Downloads the Blender zip file to a temporary location with progress."""
+        import requests
+        import tempfile
+        import shutil
+
+        """Downloads the Blender installer (zip or dmg) to a temporary location with progress."""
         self.show_progress_bar()
         self.cancel_button_main.grid()
-        temp_dir = tempfile.mkdtemp()
-        temp_zip_path = os.path.join(temp_dir, 'blender_latest.zip')
+        temp_dir = tempfile.mkdtemp() 
+        file_extension = download_url.split('.')[-1]  
+        temp_file_path = os.path.join(temp_dir, f'blender_latest.{file_extension}')
         self.cancel_event_main.clear()  
     
         try:
-            response = requests.get(download_url, stream=True)
+            response = requests.get(download_url, stream=True, timeout=10) 
+            response.raise_for_status() 
+
             total_length = response.headers.get('content-length')
             if total_length is None:
-                self.progress_var.set(100) 
+                self.progress_var.set(100)  
             else:
                 downloaded = 0
                 total_length = int(total_length)
-                with open(temp_zip_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=4096):
-                        if self.cancel_event_main.is_set(): 
+                with open(temp_file_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=4096): 
+                        if self.cancel_event_main.is_set():  
                             raise Exception("Download cancelled by user.")
                     
                         downloaded += len(chunk)
                         f.write(chunk)
                         self.progress_var.set((downloaded / total_length) * 100) 
-            return temp_zip_path
+
+            return temp_file_path  
+        except requests.RequestException as e:
+            print(f"Network error while downloading Blender: {e}")
+            messagebox.showerror("Download Error", "Failed to download Blender. Please check your internet connection.")
+            shutil.rmtree(temp_dir) 
+            return None
         except Exception as e:
             print(f"Error downloading Blender update: {e}")
-            shutil.rmtree(temp_dir)
+            shutil.rmtree(temp_dir)  
             return None
         finally:
-            self.hide_progress_bar()
-            self.cancel_button_main.grid_remove()
+            self.hide_progress_bar()  
+            self.cancel_button_main.grid_remove()  
+
 
 
     
 
-    def update_blender_files(self, temp_zip_path):
+    def update_blender_files(self, temp_file_path):
+        import platform
+        import zipfile
+        import tempfile
+        import subprocess
+
         self.disable_buttons()
-        """Extracts Blender files from the downloaded zip to the install directory, replacing old files."""
-        with zipfile.ZipFile(temp_zip_path, 'r') as zip_ref:
-            temp_extract_dir = tempfile.mkdtemp()  
-            zip_ref.extractall(temp_extract_dir) 
-            
-            extracted_items = os.listdir(temp_extract_dir)
-            if len(extracted_items) == 1 and os.path.isdir(os.path.join(temp_extract_dir, extracted_items[0])):
-                extracted_blender_folder = os.path.join(temp_extract_dir, extracted_items[0])
-            else:
-                extracted_blender_folder = temp_extract_dir  
-
-
-            if os.path.exists(self.blender_install_dir):
-                shutil.rmtree(self.blender_install_dir)
-            os.makedirs(self.blender_install_dir, exist_ok=True) 
-
-            for item in os.listdir(extracted_blender_folder):
-                source_path = os.path.join(extracted_blender_folder, item)
-                dest_path = os.path.join(self.blender_install_dir, item)
+        """Extracts Blender files from the downloaded zip/dmg to the install directory, replacing old files."""
+    
+        system = platform.system()
+        if system == "Windows" or system == "Linux":
+            if temp_file_path.endswith('.zip'):
+                with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                    temp_extract_dir = tempfile.mkdtemp()  
+                    zip_ref.extractall(temp_extract_dir) 
                 
-                if os.path.isdir(source_path):
-                    shutil.copytree(source_path, dest_path)
-                else:
-                    shutil.copy2(source_path, dest_path)
-        
-        shutil.rmtree(temp_extract_dir)
-        os.remove(temp_zip_path)
+                    extracted_items = os.listdir(temp_extract_dir)
+                    if len(extracted_items) == 1 and os.path.isdir(os.path.join(temp_extract_dir, extracted_items[0])):
+                        extracted_blender_folder = os.path.join(temp_extract_dir, extracted_items[0])
+                    else:
+                        extracted_blender_folder = temp_extract_dir  
+
+                    if os.path.exists(self.blender_install_dir):
+                        shutil.rmtree(self.blender_install_dir)
+                    os.makedirs(self.blender_install_dir, exist_ok=True) 
+
+                    for item in os.listdir(extracted_blender_folder):
+                        source_path = os.path.join(extracted_blender_folder, item)
+                        dest_path = os.path.join(self.blender_install_dir, item)
+                    
+                        if os.path.isdir(source_path):
+                            shutil.copytree(source_path, dest_path)
+                        else:
+                            shutil.copy2(source_path, dest_path)
+                
+                shutil.rmtree(temp_extract_dir)
+                os.remove(temp_file_path)
+            else:
+                print("Unsupported file format for Windows/Linux. Only .zip is supported.")
+        elif system == "Darwin":  
+            if temp_file_path.endswith('.dmg'):
+                mount_point = tempfile.mkdtemp()
+                try:
+                    subprocess.run(["hdiutil", "attach", temp_file_path, "-mountpoint", mount_point], check=True)
+                    blender_app_path = os.path.join(mount_point, "Blender.app")
+                    if os.path.exists(blender_app_path):
+                        if os.path.exists(self.blender_install_dir):
+                            shutil.rmtree(self.blender_install_dir)
+                        os.makedirs(self.blender_install_dir, exist_ok=True)
+                    
+                        shutil.copytree(blender_app_path, os.path.join(self.blender_install_dir, "Blender.app"))
+                    else:
+                        raise Exception("Blender.app not found in mounted .dmg.")
+                finally:
+                    subprocess.run(["hdiutil", "detach", mount_point], check=True)
+                    shutil.rmtree(mount_point)
+                    os.remove(temp_file_path)
+            else:
+                print("Unsupported file format for MacOS. Only .dmg is supported.")
+        else:
+            print(f"Unsupported operating system: {system}")
+            raise EnvironmentError(f"Unsupported operating system: {system}")
+    
         self.enable_buttons()
 
 
@@ -2340,9 +2644,14 @@ For further details, please refer to the user manual or visit our support site."
 
     def launch_latest_blender(self):
         """Launch Blender if installed, or install it if not."""
+        import platform
+
         def launch():
-            
-            blender_exe = os.path.join(self.blender_install_dir, 'blender.exe')
+            blender_exe = self.get_blender_executable_path()
+            if not blender_exe:  
+                print("Blender is not installed.")
+                return
+
             settings_file = os.path.join(os.path.expanduser('~'), '.BlenderManager', 'mngaddon', 'settings.json')
 
             if os.path.isfile(blender_exe):
@@ -2350,11 +2659,13 @@ For further details, please refer to the user manual or visit our support site."
                     self.launch_button.config(text="Running", state='disabled')
                     self.update_button.config(text="Check Updates", state='disabled')
 
-                    process = subprocess.Popen([blender_exe], creationflags=subprocess.CREATE_NO_WINDOW)
+                    if platform.system() == "Windows":
+                        process = subprocess.Popen([blender_exe], creationflags=subprocess.CREATE_NO_WINDOW)
+                    else:
+                        process = subprocess.Popen([blender_exe])
 
                     def monitor_process():
-                        process.wait()  
-
+                        process.wait()  # Blender işlemini izleme
 
                         self.main_menu_frame.after(0, self.update_project_times)
                         self.main_menu_frame.after(0, self.refresh_recent_projects)
@@ -2371,7 +2682,7 @@ For further details, please refer to the user manual or visit our support site."
                 except Exception as e:
                     self.main_menu_frame.after(0, lambda: messagebox.showerror("Launch Error", f"Failed to launch Blender:\n{e}"))
             else:
-                self.show_install_dialog()
+                print("Blender executable path is invalid.")
 
         threading.Thread(target=launch, daemon=True).start()
 
@@ -2485,11 +2796,11 @@ For further details, please refer to the user manual or visit our support site."
                 if not selected_folder:
                     return None  
 
-                blender_exe_path = os.path.join(selected_folder, "blender.exe")
+                blender_exe_path = self.get_blender_executable_path()
                 if os.path.isfile(blender_exe_path):
                     return selected_folder  
                 else:
-                    messagebox.showerror("Invalid Folder", "The selected folder does not contain blender.exe. Please try again.")
+                    messagebox.showerror("Invalid Folder", "The selected folder does not contain blender. Please try again.")
 
         def transfer_files(source_folder, target_folder):
             try:
@@ -2556,7 +2867,7 @@ For further details, please refer to the user manual or visit our support site."
     
         def update_process():
             try:
-                blender_exe = os.path.join(self.blender_install_dir, 'blender.exe')
+                blender_exe = self.get_blender_executable_path()
                 if not os.path.isfile(blender_exe):
                     messagebox.showwarning("Blender Not Installed", "Blender is not installed.")
                     return
@@ -2639,7 +2950,7 @@ For further details, please refer to the user manual or visit our support site."
         """Checks for Blender updates and installs if a new version is available."""
 
         def update_process():
-            blender_exe = os.path.join(self.blender_install_dir, 'blender.exe')
+            blender_exe = self.get_blender_executable_path()
             if not os.path.isfile(blender_exe):
                 print("Blender is not installed")
                 return
@@ -2693,7 +3004,7 @@ For further details, please refer to the user manual or visit our support site."
         if selected_item:
             project_path = self.get_selected_project_path()  
             if project_path and project_path.endswith('.blend'):
-                blender_exe = os.path.join(self.blender_install_dir, 'blender.exe')  
+                blender_exe = self.get_blender_executable_path()  
             
                
                 if os.path.isfile(blender_exe):
@@ -2735,7 +3046,7 @@ For further details, please refer to the user manual or visit our support site."
 
     def get_installed_blender_version(self):
         """Retrieves the version of the currently installed Blender, if available."""
-        blender_exe = os.path.join(self.blender_install_dir, 'blender.exe')
+        blender_exe = self.get_blender_executable_path()
     
         if os.path.isfile(blender_exe):
             try:
@@ -3251,7 +3562,7 @@ For further details, please refer to the user manual or visit our support site."
 
     def populate_blender_versions(self):
         """Populate Blender versions in the comboboxes."""
-        base_dir = os.path.join(os.getenv("APPDATA"), "Blender Foundation", "Blender")
+        base_dir = get_blender_config_path()
         if not os.path.exists(base_dir):
             messagebox.showwarning("Warning", "No Blender versions found.")
             return
@@ -3277,7 +3588,7 @@ For further details, please refer to the user manual or visit our support site."
             messagebox.showerror("Error", "Please select both source and destination versions.")
             return
 
-        base_dir = os.path.join(os.getenv("APPDATA"), "Blender Foundation", "Blender")
+        base_dir = get_blender_config_path()
         source_path = os.path.join(base_dir, source_version)
         destination_path = os.path.join(base_dir, destination_version)
 
@@ -3326,6 +3637,7 @@ For further details, please refer to the user manual or visit our support site."
                 self.notebook.add(self.plugins_tab, text="Addon Management")
                 self.create_plugins_tab()
             elif tab_name == "Project Management" and not hasattr(self, "project_management_tab"):
+                self.projects_tree = ttk.Treeview(self)
                 self.project_management_tab = ttkb.Frame(self.notebook)
                 self.notebook.add(self.project_management_tab, text="Project Management")
                 self.create_project_management_tab()
@@ -3693,11 +4005,11 @@ For further details, please refer to the user manual or visit our support site."
                 if not selected_folder:
                     return None  
 
-                blender_exe_path = os.path.join(selected_folder, "blender.exe")
+                blender_exe_path = self.get_blender_executable_path()
                 if os.path.isfile(blender_exe_path):
                     return selected_folder  
                 else:
-                    messagebox.showerror("Invalid Folder", "The selected folder does not contain blender.exe. Please try again.")
+                    messagebox.showerror("Invalid Folder", "The selected folder does not contain Blender. Please try again.")
 
         def transfer_files(source_folder, target_folder):
             try:
@@ -3802,7 +4114,7 @@ For further details, please refer to the user manual or visit our support site."
             messagebox.showerror("Error", "Addon zip file not found in the current directory. Please ensure the addon zip file is present.")
             return
 
-        blender_foundation_path = os.path.join(os.getenv('APPDATA'), "Blender Foundation", "Blender")
+        blender_foundation_path = get_blender_config_path()
 
         addon_folder_names = ["Blender Manager", "BlenderManager", "Blender_Manager"]
 
@@ -3852,7 +4164,7 @@ For further details, please refer to the user manual or visit our support site."
             print("Error: Addon zip file not found in the current directory. Please ensure the addon zip file is present.")
             return
 
-        blender_foundation_path = os.path.join(os.getenv('APPDATA'), "Blender Foundation", "Blender")
+        blender_foundation_path = get_blender_config_path()
 
         addon_folder_names = ["Blender Manager", "BlenderManager", "Blender_Manager"]
 
@@ -3941,7 +4253,7 @@ For further details, please refer to the user manual or visit our support site."
                 else:
                     messagebox.showerror("Error", f"Failed to apply theme: {e}")
             except Exception as e:
-                messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+                print(f"An unexpected error occurred: {e}")
 
     def apply_custom_styles(self):
         """Reapply custom styles to maintain consistency after theme change."""
@@ -4235,6 +4547,7 @@ For further details, please refer to the user manual or visit our support site."
 
     def duplicate_addon_to_version(self, target_version):
         """Duplicate the selected addon to the specified Blender version."""
+        import platform
         selected_item = self.plugins_tree.focus()
         if not selected_item:
             messagebox.showerror("Error", "No addon selected.")
@@ -4247,10 +4560,15 @@ For further details, please refer to the user manual or visit our support site."
             messagebox.showerror("Error", "The selected addon does not exist.")
             return
 
+
+        try:
+            blender_config_path = get_blender_config_path()
+        except EnvironmentError as e:
+            messagebox.showerror("Error", f"Failed to determine Blender configuration path: {e}")
+            return
+
         target_addon_path = os.path.join(
-            os.getenv('APPDATA'),
-            "Blender Foundation",
-            "Blender",
+            blender_config_path,
             target_version,
             "scripts",
             "addons",
@@ -4274,8 +4592,11 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
+
     
     def view_plugin_document(self):
+        import ast
+
         """Open the documentation link for the selected plugin."""
         import webview
         selected_item = self.plugins_tree.focus()
@@ -4351,9 +4672,9 @@ For further details, please refer to the user manual or visit our support site."
 
 
     def get_blender_versions_for_plugins(self):
-        """Retrieve available Blender versions from the AppData directory."""
+        """Retrieve available Blender versions."""
         versions = []
-        blender_foundation_path = os.path.join(os.getenv('APPDATA'), "Blender Foundation", "Blender")
+        blender_foundation_path = get_blender_config_path()
 
         if os.path.exists(blender_foundation_path):
             for folder in os.listdir(blender_foundation_path):
@@ -4369,8 +4690,20 @@ For further details, please refer to the user manual or visit our support site."
             print("No version selected.")
             return
 
-        appdata_dir = os.getenv('APPDATA')
-        self.directory_path.set(os.path.join(appdata_dir, "Blender Foundation", "Blender", selected_version, "scripts", "addons"))
+        try:
+            blender_config_path = get_blender_config_path()
+        except EnvironmentError as e:
+            print(f"Error determining Blender config path: {e}")
+            return
+
+        self.directory_path.set(
+            os.path.join(
+                blender_config_path, 
+                selected_version, 
+                "scripts", 
+                "addons"
+            )
+        )
         self.refresh_plugins_list()
 
 
@@ -4453,13 +4786,21 @@ For further details, please refer to the user manual or visit our support site."
 
 
     def get_default_plugin_directory(self):
-        """Get the default plugin directory based on AppData."""
-        appdata_dir = os.getenv('APPDATA')
-        if appdata_dir:
-            return os.path.join(appdata_dir, "Blender Foundation", "Blender", "4.2", "scripts", "addons")
-        else:
-            messagebox.showerror("Error", "AppData directory not found.")
+        """Get the default plugin directory based on the platform."""
+        try:
+            blender_config_path = get_blender_config_path()
+        except EnvironmentError as e:
+            messagebox.showerror("Error", f"Failed to determine Blender configuration path: {e}")
             return None
+
+        default_version = "4.2"  
+        plugin_directory = os.path.join(
+            blender_config_path, 
+            default_version, 
+            "scripts", 
+            "addons"
+        )
+        return plugin_directory
 
     def load_plugin_directory(self):
         """Load the plugin directory from a configuration file."""
@@ -4514,6 +4855,8 @@ For further details, please refer to the user manual or visit our support site."
 
 
     def get_plugin_info(self, addon_path):
+        import ast
+
         """Read the plugin's bl_info to extract version and compatibility information."""
         version = "Unknown"
         compatible = "Unknown"
@@ -5112,7 +5455,7 @@ For further details, please refer to the user manual or visit our support site."
         output_file = os.path.splitext(os.path.basename(blend_path))[0] + f".{export_format}"
         output_path = os.path.join(output_dir, output_file)
 
-        blender_path = os.path.expanduser("~/.blendermanager/blender/blender.exe")
+        blender_path = self.get_blender_executable_path()
         if not os.path.exists(blender_path):
             messagebox.showerror("Error", f"Blender executable not found at: {blender_path}")
             return
@@ -5376,6 +5719,10 @@ elif '{export_format}' == 'abc':
 
     def on_search_change(self, *args):
         """Filter the TreeView based on the search query and scroll to the matching item."""
+        if not hasattr(self, 'projects_tree'):
+            print("Error: projects_tree is not defined yet.")
+            return
+
         query = self.project_search_var.get().strip().lower()
         if not query or query == self.placeholder_text:
             self.refresh_projects_list()
@@ -5718,16 +6065,22 @@ elif '{export_format}' == 'abc':
     def load_project_directory(self):
         """Load the project directory from a configuration file or return a default path."""
         config_file_path = os.path.join(os.path.expanduser("~"), ".BlenderManager", "paths", "project_directory.json")
-        default_project_dir = os.path.join(os.getenv('APPDATA'), "Blender Foundation", "Blender", "Projects")
-    
+
+        try:
+            blender_config_path = get_blender_config_path()
+        except EnvironmentError as e:
+            messagebox.showerror("Error", f"Failed to determine Blender configuration path: {e}")
+            return None
+
+        default_project_dir = os.path.join(blender_config_path, "Projects")
+
         try:
             with open(config_file_path, 'r') as f:
                 data = json.load(f)
             return data.get('project_directory', default_project_dir)
         except FileNotFoundError:
-           
             if not os.path.exists(default_project_dir):
-                os.makedirs(default_project_dir)
+                os.makedirs(default_project_dir, exist_ok=True)
             return default_project_dir
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load project directory: {e}")
@@ -5735,7 +6088,7 @@ elif '{export_format}' == 'abc':
 
 
   #------------------------------------------------------------#  
-  #-------------------Installed Versions Tab-------------------#
+  #-------------------Version Management------------------------#
   #------------------------------------------------------------#      
 
 
@@ -5936,45 +6289,57 @@ elif '{export_format}' == 'abc':
 
 
     def launch_blender(self):
+        """
+        Launch the selected version of Blender. Handles .app packages for macOS.
+        """
+        import platform
+        import subprocess
+        import threading
+
         selected_item = self.installed_versions_tree.focus()
         if not selected_item:
             self.after(0, lambda: messagebox.showwarning("Warning", "Please select a Blender version to launch."))
             return
+
         selected_version = self.installed_versions_tree.item(selected_item)['values'][0]
-        blender_exec = self.resource_path(os.path.join(BLENDER_DIR, selected_version, 'blender'))
+        blender_dir = os.path.join(BLENDER_DIR, selected_version)
+    
+        if platform.system() == "Darwin":  
+            blender_exec = os.path.join(blender_dir, "Blender.app", "Contents", "MacOS", "Blender")
+        else: 
+            blender_exec = os.path.join(blender_dir, "blender")
+            if platform.system() == "Windows":
+                blender_exec += ".exe"
 
-        if os.name == 'nt':
-            blender_exec += '.exe'
+        if not os.path.isfile(blender_exec):
+            self.after(0, lambda: messagebox.showerror("Error", f"Blender executable not found for version {selected_version}."))
+            return
 
-        if os.path.isfile(blender_exec):
-            print(f"Launching {selected_version}...")
-            self.remove_button.configure(state='disabled')
-            self.launch_installed_button.configure(state='disabled')
-            self.after(5000, lambda: self.launch_installed_button.configure(state='normal'))
-            
-            try:
-                if self.launch_factory_var.get():
-                    process = subprocess.Popen([blender_exec, '--factory-startup'], creationflags=subprocess.CREATE_NO_WINDOW)
+        print(f"Launching Blender version {selected_version} from: {blender_exec}")
 
-                    print(f"Launching {selected_version} with factory settings...")
-                else:
-                    process = subprocess.Popen([blender_exec], creationflags=subprocess.CREATE_NO_WINDOW)
-                    
-                def monitor_process():
-                    process.wait()
-                    self.remove_button.configure(state='normal')
-                    
+        self.remove_button.configure(state='disabled')
+        self.launch_installed_button.configure(state='disabled')
+        self.after(5000, lambda: self.launch_installed_button.configure(state='normal'))
 
+        try:
+            args = [blender_exec]
+            if self.launch_factory_var.get():
+                args.append('--factory-startup')
+                print(f"Launching {selected_version} with factory settings...")
 
-                threading.Thread(target=monitor_process, daemon=True).start()
+            process = subprocess.Popen(args)
 
-
-            except Exception as e:
-                self.after(0, lambda: messagebox.showerror("Error", f"Failed to launch Blender: {e}"))
+            def monitor_process():
+                process.wait()
                 self.remove_button.configure(state='normal')
-        else:
-            self.after(0, lambda: messagebox.showerror("Error", "Blender executable not found."))
+                print(f"Blender version {selected_version} has exited.")
+
+            threading.Thread(target=monitor_process, daemon=True).start()
+
+        except Exception as e:
+            self.after(0, lambda: messagebox.showerror("Error", f"Failed to launch Blender: {e}"))
             self.remove_button.configure(state='normal')
+
             
 
 
@@ -6271,6 +6636,8 @@ elif '{export_format}' == 'abc':
             alternative_url = f"https://developer.blender.org/docs/release_notes/{major_version}.{minor_version}/"
 
             def check_url(url):
+                import requests
+
                 try:
                     response = requests.head(url)
                     return response.status_code == 200
@@ -6337,6 +6704,8 @@ elif '{export_format}' == 'abc':
 
 
     def run_async_fetch_stable_versions(self):
+        import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self.async_fetch_stable_versions())
@@ -6344,6 +6713,11 @@ elif '{export_format}' == 'abc':
         self.install_tab.after(0, self.reset_get_stable_button)
 
     async def async_fetch_stable_versions(self):
+        import ssl
+        import aiohttp
+        import certifi
+        from bs4 import BeautifulSoup
+
         os_map = {
             "Windows": "windows",
             "macOS": "darwin",
@@ -6405,6 +6779,11 @@ elif '{export_format}' == 'abc':
             self.queue.put(('ERROR', f"An unexpected error occurred: {str(e)}"))
 
     async def fetch_all_versions(self, version_links, platform, architecture, session, ssl_context):
+        import ssl
+        import asyncio
+        import certifi
+
+
         base_url = "https://download.blender.org/release/"
         ssl_context = ssl.create_default_context(cafile=certifi.where())
         tasks = [
@@ -6424,6 +6803,10 @@ elif '{export_format}' == 'abc':
         return versions, links, dates
 
     async def fetch_version_page(self, session, version_url, platform, architecture, ssl_context):
+
+        from bs4 import BeautifulSoup
+
+
         try:
             async with session.get(version_url, ssl=ssl_context) as response:
                 response.raise_for_status()
@@ -6500,6 +6883,11 @@ elif '{export_format}' == 'abc':
 
 
     def fetch_unstable_versions(self):
+        
+        from bs4 import BeautifulSoup
+        import requests
+
+
         os_map = {
             "Windows": "windows",
             "macOS": "darwin",
@@ -6615,6 +7003,8 @@ elif '{export_format}' == 'abc':
 
 
     def download_and_install(self, version, download_url):
+        import requests
+
         import shutil
         file_name = os.path.basename(download_url)
         file_path = os.path.join(BLENDER_MANAGER_DIR, file_name)
@@ -6668,6 +7058,30 @@ elif '{export_format}' == 'abc':
                                             shutil.copyfileobj(source, target)
                     else:
                         zip_ref.extractall(extracted_path)
+                        
+
+
+
+            elif file_name.endswith('.dmg'):
+                mount_point = tempfile.mkdtemp()
+                try:
+                    subprocess.run(["hdiutil", "attach", file_path, "-mountpoint", mount_point], check=True)
+
+                    blender_app_path = os.path.join(mount_point, "Blender.app")
+                    if os.path.exists(blender_app_path):
+                        shutil.copytree(blender_app_path, os.path.join(extracted_path, "Blender.app"))
+                    else:
+                        raise Exception("Blender.app not found in mounted .dmg.")
+
+                finally:
+                    subprocess.run(["hdiutil", "detach", mount_point], check=True)
+                    shutil.rmtree(mount_point)
+                    os.remove(file_path)
+
+
+
+
+
             elif file_name.endswith(('.tar.gz', '.tar.xz')):
                 with tarfile.open(file_path, 'r:*') as tar_ref:
                     root_items = tar_ref.getnames()
@@ -6861,8 +7275,11 @@ if __name__ == "__main__":
 
     try:
         app = BlenderManagerApp()
+        app.initialize_app()
         app.mainloop()
     except Exception as e:
+        import traceback
+
         error_message = f"An unexpected error occurred: {str(e)}\n"
         error_message += traceback.format_exc()  
         log_error_to_file(error_message) 
