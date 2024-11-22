@@ -1,0 +1,9 @@
+ttkbootstrap
+tkinterdnd2
+pystray
+Pillow
+beautifulsoup4
+pywebview
+psutil
+pywin32
+requests
