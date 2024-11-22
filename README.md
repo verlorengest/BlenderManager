@@ -153,6 +153,72 @@ Blender Manager is now installed and ready to enhance your Blender workflow. Enj
 
 ---
 
+
+# How to Run BlenderManager from Source
+
+Follow the instructions below to clone, set up, and run **BlenderManager** from the source code. Ensure you have Python installed on your system (version 3.10 or higher is recommended).
+
+---
+
+## Prerequisites
+
+1. **Python Installation**: Ensure Python 3.10+ is installed and added to your system's PATH. You can download Python from the [official Python website](https://www.python.org/downloads/).
+
+2. **Git Installation**: Ensure Git is installed on your system. You can download Git from [here](https://git-scm.com/downloads).
+
+---
+
+## Steps to Run the Project
+
+### Step 1: Clone the Repository
+Use the following command to clone the BlenderManager repository to your local machine:
+```bash
+git clone https://github.com/verlorengest/BlenderManager.git
+```
+
+Navigate to the project directory:
+```bash
+cd BlenderManager
+```
+
+### Step 2: Install Dependencies
+Create a virtual environment (optional but recommended):
+```bash
+python -m venv venv
+```
+
+Activate the virtual environment:
+- **Windows**:
+  ```bash
+  venv\Scripts\activate
+  ```
+- **macOS/Linux**:
+  ```bash
+  source venv/bin/activate
+  ```
+
+Install the required dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+### Step 3: Run BlenderManager
+Run the application using the following command:
+```bash
+python blender_manager.py
+```
+
+---
+
+## Additional Notes
+- Ensure you have **Blender** installed or configure the application to detect an existing Blender installation. If Blender is not installed, the app will prompt you to install it.
+- The application may require elevated permissions to access certain directories or system settings, depending on your operating system.
+- For further assistance or issues, please open a ticket on the [GitHub Issues Page](https://github.com/verlorengest/BlenderManager/issues).
+
+---
+
+
+
 </details>
 
 
