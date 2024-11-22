@@ -2686,83 +2686,83 @@ For further details, please refer to the user manual or visit our support site."
 
         threading.Thread(target=launch, daemon=True).start()
 
+
+
+
     def show_install_dialog(self):
-        """Show a custom, improved dialog with Yes, No, and Already Installed options."""
         dialog = tk.Toplevel(self)
-        dialog.title("Blender is Not Installed")
-        dialog.geometry("350x180")
+        dialog.title("Blender Not Installed")
+        dialog.geometry("320x180")
         dialog.resizable(False, False)
-        dialog.iconbitmap(r"Assets/Images/bmng.ico")
-        dialog.update_idletasks()  
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.update_idletasks()
+
         x = self.winfo_x() + (self.winfo_width() // 2) - (dialog.winfo_width() // 2)
         y = self.winfo_y() + (self.winfo_height() // 2) - (dialog.winfo_height() // 2)
         dialog.geometry(f"+{x}+{y}")
-        dialog.transient(self)  
-        dialog.grab_set()  
 
-        label = tk.Label(
-            dialog,
-            text="Blender is not installed. Would you like to install it?",
-            font=("Segoe UI", 11)
+        style = ttk.Style(dialog)
+        style.configure(
+            "Unique.TButton",
+            font=("Segoe UI", 10),
+            padding=5,
+            background="#0078D7",
+            foreground="white",
+            relief="flat"
         )
-        label.pack(pady=20)
+        style.map(
+            "Unique.TButton",
+            background=[("active", "#005a9e")],
+            foreground=[("active", "white")]
+        )
 
-        button_frame = tk.Frame(dialog, bg="#f7f7f7")
-        button_frame.pack(pady=10)
+        main_frame = ttk.Frame(dialog, padding=(20, 10))
+        main_frame.pack(fill="both", expand=True)
 
-        def on_enter(button, hover_color):
-            button['bg'] = hover_color
+        label = ttk.Label(
+            main_frame,
+            text="Blender is not installed.\nWould you like to install it?",
+            font=("Segoe UI", 11, "bold"),
+            anchor="center",
+            justify="center",
+            wraplength=280
+        )
+        label.pack(pady=(0, 15))
 
-        def on_leave(button, original_color):
-            button['bg'] = original_color
+        button_frame_top = ttk.Frame(main_frame)
+        button_frame_top.pack(pady=(0, 10))
 
-        yes_button = tk.Button(
-            button_frame,
+        yes_button = ttk.Button(
+            button_frame_top,
             text="Yes",
+            style="Unique.TButton",
             command=lambda: self.install_blender(dialog),
-            font=("Segoe UI", 10),
-            bg="#4CAF50",
-            fg="white",
-            activebackground="#45a049",
-            activeforeground="white",
-            relief="flat",
-            width=10
+            width=14
         )
-        yes_button.grid(row=0, column=0, padx=10)
-        yes_button.bind("<Enter>", lambda e: on_enter(yes_button, "#45a049"))
-        yes_button.bind("<Leave>", lambda e: on_leave(yes_button, "#4CAF50"))
-
-        no_button = tk.Button(
-            button_frame,
+        no_button = ttk.Button(
+            button_frame_top,
             text="No",
+            style="Unique.TButton",
             command=dialog.destroy,
-            font=("Segoe UI", 10),
-            bg="#f44336",
-            fg="white",
-            activebackground="#e53935",
-            activeforeground="white",
-            relief="flat",
-            width=10
+            width=14
         )
-        no_button.grid(row=0, column=1, padx=10)
-        no_button.bind("<Enter>", lambda e: on_enter(no_button, "#e53935"))
-        no_button.bind("<Leave>", lambda e: on_leave(no_button, "#f44336"))
 
-        already_installed_button = tk.Button(
-            button_frame,
+        yes_button.grid(row=0, column=0, padx=5, pady=5)
+        no_button.grid(row=0, column=1, padx=5, pady=5)
+
+        already_installed_button = ttk.Button(
+            main_frame,
             text="Already Installed",
-            command=lambda: self.handle_existing_blender(dialog), 
-            font=("Segoe UI", 10),
-            bg="#2196F3",
-            fg="white",
-            activebackground="#1976d2",
-            activeforeground="white",
-            relief="flat",
-            width=15
+            style="Unique.TButton",
+            command=lambda: self.handle_existing_blender(dialog),
+            width=30
         )
-        already_installed_button.grid(row=0, column=2, padx=10)
-        already_installed_button.bind("<Enter>", lambda e: on_enter(already_installed_button, "#1976d2"))
-        already_installed_button.bind("<Leave>", lambda e: on_leave(already_installed_button, "#2196F3"))
+        already_installed_button.pack(pady=(0, 10))
+
+        dialog.focus_set()
+        dialog.wait_window()
+
 
 
 
@@ -3925,36 +3925,6 @@ For further details, please refer to the user manual or visit our support site."
         print(f"Auto Update set to: {is_checked}")
 
 
-    def delete_main_blender_version(self):
-        
-        blender_dir = BLENDER_PATH 
-        
-        if not os.path.exists(blender_dir):
-            messagebox.showinfo("Info", "Blender is not installed" )
-            return
-        
-        confirm = messagebox.askyesno("Confirm Deletion", "Are you sure you want to delete Blender? This action cannot be undone.")
-
-        if confirm:
-            self.delete_main_blender_button.configure(state='disabled')
-            
-            try:
-                for item in os.listdir(blender_dir):
-                    item_path = os.path.join(blender_dir, item)
-                    if os.path.isdir(item_path):
-                        shutil.rmtree(item_path)
-                        
-                    else:
-                        os.remove(item_path)
-                        
-                messagebox.showinfo("Success", "Blender uninstalled successfully.")
-                self.delete_main_blender_button.configure(state='normal')
-                
-            except Exception as e:
-                messagebox.showerror("Error", f"An error occurred while deleting Blender versions:\n{e}")
-                self.delete_all_versions_button.configure(state='normal')
-
-
 
 
     def delete_all_blender_versions(self):
@@ -4498,22 +4468,7 @@ For further details, please refer to the user manual or visit our support site."
             self.plugins_tree.selection_set(item_id)
             self.plugin_context_menu.tk_popup(event.x_root, event.y_root)
 
-    def delete_selected_plugin(self):
-        """Deletes the selected plugin."""
-        selected_item = self.plugins_tree.selection()
-        if selected_item:
-            plugin_name = self.plugins_tree.item(selected_item, "values")[0]
-            print(f"Deleting plugin: {plugin_name}")
-            self.plugins_tree.delete(selected_item) 
 
-    def show_plugin_info(self):
-        """Shows information about the selected plugin."""
-        selected_item = self.plugins_tree.selection()
-        if selected_item:
-            plugin_info = self.plugins_tree.item(selected_item, "values")
-            print(f"Plugin Info: {plugin_info}")
-
-        
 
 
 
