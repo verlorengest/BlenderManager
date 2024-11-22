@@ -2791,20 +2791,35 @@ For further details, please refer to the user manual or visit our support site."
         """Handle the process of selecting an existing Blender installation and moving its contents."""
 
         def select_and_validate_folder():
+            """Prompt the user to select a folder and validate it contains a valid Blender executable."""
             while True:
                 selected_folder = filedialog.askdirectory(title="Select Blender Installation Folder")
                 if not selected_folder:
                     return None  
 
-                blender_exe_path = self.get_blender_executable_path()
+                import platform
+                system = platform.system()
+                if system == "Windows":
+                    blender_exe_path = os.path.join(selected_folder, "blender.exe")
+                elif system == "Darwin":  # macOS
+                    blender_exe_path = os.path.join(selected_folder, "Blender.app", "Contents", "MacOS", "Blender")
+                elif system == "Linux":
+                    blender_exe_path = os.path.join(selected_folder, "blender")
+                else:
+                    messagebox.showerror("Unsupported OS", "Your operating system is not supported.")
+                    return None
+
                 if os.path.isfile(blender_exe_path):
                     return selected_folder  
                 else:
-                    messagebox.showerror("Invalid Folder", "The selected folder does not contain blender. Please try again.")
+                    messagebox.showerror(
+                        "Invalid Folder",
+                        "The selected folder does not contain a valid Blender executable. Please try again."
+                    )
 
         def transfer_files(source_folder, target_folder):
+            """Transfer Blender files from the source to the target folder."""
             try:
-                
                 if os.path.exists(target_folder):
                     shutil.rmtree(target_folder)
                 os.makedirs(target_folder)
@@ -2818,38 +2833,36 @@ For further details, please refer to the user manual or visit our support site."
                         shutil.copy2(source_item, target_item)
 
                 shutil.rmtree(source_folder)
-
-
                 self.main_menu_frame.after(0, self.enable_buttons)
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred while transferring files: {e}")
             finally:
                 self.main_menu_frame.after(0, hide_loading_bar)
 
-
-
         def show_loading_bar():
+            """Show a loading bar on the main menu frame."""
             self.loading_bar = tk.Label(self.main_menu_frame, text="Loading...", font=("Segoe UI", 10))
-            self.loading_bar.grid(row=3, column=0, pady=10)  
+            self.loading_bar.grid(row=3, column=0, pady=10)
 
         def hide_loading_bar():
+            """Hide the loading bar."""
             if hasattr(self, 'loading_bar'):
                 self.loading_bar.destroy()
 
         dialog.destroy()
-
         self.disable_buttons()
         show_loading_bar()
 
         selected_folder = select_and_validate_folder()
         if not selected_folder:
-            hide_loading_bar() 
-            self.enable_buttons()  
+            hide_loading_bar()
+            self.enable_buttons()
             return
 
-        target_folder = BLENDER_PATH
-
+        target_folder = BLENDER_PATH 
         threading.Thread(target=transfer_files, args=(selected_folder, target_folder), daemon=True).start()
+
+
 
 
 
@@ -3100,7 +3113,6 @@ For further details, please refer to the user manual or visit our support site."
     def open_settings_window(self):
         """Open the Settings window with all options and features."""
 
-        # Check if the settings window already exists and bring it to focus
         if hasattr(self, 'settings_window') and self.settings_window.winfo_exists():
             self.settings_window.lift()
             return
