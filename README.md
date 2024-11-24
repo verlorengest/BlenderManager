@@ -9,6 +9,14 @@
 <details>
 <summary>📋 <strong>Screenshots</strong></summary>
 
+   
+![900x](https://github.com/user-attachments/assets/899f9f7a-251e-4e2e-90fd-59d319db9449)
+
+Selected Font: SimHei
+
+
+**the following are old version of gui**
+
 ![Screenshot 1](https://github.com/user-attachments/assets/2b12f8dd-0f75-4cbc-9e41-2e06c2e4d84f)
 
 ![Screenshot 2](https://github.com/user-attachments/assets/858fc794-03aa-4eb5-ad2a-1b7cf37e190d)
