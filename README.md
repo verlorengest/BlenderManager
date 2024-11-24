@@ -147,11 +147,8 @@ Follow these steps to install and set up Blender Manager on your system.
 
 ### **Step 4: Verify the Addon Installation**
 
-1. Launch **Blender**.
-2. Navigate to **Edit** > **Preferences** > **Add-ons**.
-3. In the search bar, type **"Blender Manager"**.
-4. Ensure the addon is enabled (checkbox is checked).
-5. Restart Blender for the changes to take effect.
+1. Activate the **Blender Manager** Addon in Addon Management tab.
+2. Click **Launch Blender** in Main Menu.
 
 ---
 
