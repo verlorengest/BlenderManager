@@ -132,6 +132,7 @@ Follow these steps to install and set up Blender Manager on your system.
 1. Open the **BlenderManager** folder.
 2. Double-click on **`blender_manager.exe`** to start the application.
    - If a security prompt appears, click **"Run Anyway"**.
+3. Install Blender by clicking Launch Blender in Main Menu
 
 ---
 
