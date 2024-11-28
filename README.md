@@ -107,10 +107,10 @@ Gives users full control over the application's appearance and behavior:
 
 </details>
 
----
+
 
 <details>
-<summary>🛠️ <strong>Blender Manager Installation Guide</strong></summary>
+<summary>🛠️ <strong>Installation Guide</strong></summary>
 
 Follow these steps to install and set up Blender Manager on your system.
 
