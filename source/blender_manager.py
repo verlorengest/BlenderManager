@@ -17,7 +17,7 @@ def get_blender_config_path():
             return os.path.join(appdata, "Blender Foundation", "Blender")
         else:
             raise EnvironmentError("APPDATA environment variable is not set.")
-    elif system == "Darwin":  # MacOS
+    elif system == "Darwin": 
         paths_to_check = [
             os.path.expanduser("~/Library/Application Support/Blender"),
             "/Applications/Blender.app/Contents/Resources/config",
@@ -54,7 +54,7 @@ def get_blender_config_path():
 
 import sys
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import Button, ttk, messagebox, filedialog
 import tkinter.simpledialog as simpledialog
 from tkinterdnd2 import TkinterDnD, DND_FILES
 import ttkbootstrap as ttkb
@@ -92,7 +92,7 @@ class WINDOWCOMPOSITIONATTRIBDATA(ctypes.Structure):
 
 def enable_dark_mode(hwnd):
     DWMWA_USE_IMMERSIVE_DARK_MODE = 20  
-    dark_mode = ctypes.c_int(1)  # 1 = Dark Mod, 0 = Light Mod
+    dark_mode = ctypes.c_int(1)  
     ctypes.windll.dwmapi.DwmSetWindowAttribute(
         hwnd,
         DWMWA_USE_IMMERSIVE_DARK_MODE,
@@ -105,7 +105,7 @@ def enable_dark_mode(hwnd):
 
 CONFIG_FILE_PATH = os.path.join(os.path.expanduser("~"), ".BlenderManager", "config.json")
 DEFAULT_SETTINGS = {
-    "version": "0.0.8",
+    "version": "0.0.9",
     "selected_theme": "darkly",
     "auto_update_checkbox": True,
     "bm_auto_update_checkbox": False,
@@ -114,15 +114,14 @@ DEFAULT_SETTINGS = {
     "chunk_size_multiplier": 3,
     "window_alpha": 0.98,
     "treeview_font_size": 12,
-    "treeview_heading_font_size": 14,
+    "treeview_heading_font_size": 10,
     "treeview_font_family": "Segoe UI",
     "button_font_family": "Segoe UI",
-    "button_font_size": 14,
+    "button_font_size": 11,
     "show_addon_management": True,
     "show_project_management": True,
     "show_render_management": True,
-    "show_version_management": True,
-    "show_installation": True
+    "show_version_management": True
 }
 
 BLENDER_MANAGER_DIR = os.path.join(os.path.expanduser("~"), ".BlenderManager")
@@ -133,6 +132,7 @@ RENDERFOLDER_PATH = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'pa
 PROJECT_RUNTIME_PATH = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'mngaddon', 'project_time.json')
 BASE_MESH_PATH = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'paths', 'base_mesh_path.json')
 BLENDER_PATH = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'blender')
+BLENDER_ABSOLUTE_PATH = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'blender', 'blender.exe')
 
 
 
@@ -202,8 +202,8 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.check_existing_window_and_tray()
         self.title("Blender Manager")  
-        self.geometry("700x400")              
-        self.minsize(900, 600)
+        self.geometry("800x550")              
+        self.minsize(800, 550)
         self.maxsize(1920, 1080)
         self.style = ttkb.Style() 
         self.load_settings_on_begining()
@@ -276,7 +276,10 @@ class BlenderManagerApp(TkinterDnD.Tk):
             'vomit_vibes': 'vomit_vibes',
             'radioactive_swamp': 'radioactive_swamp',
             'painful_pink': 'painful_pink',
-            'toxic_circus': 'toxic_circus'
+            'toxic_circus': 'toxic_circus',
+            'rainbow': 'rainbow',
+            'smoothie': 'smoothie',
+            'cream_pastel': 'cream_pastel'
 
 
         }
@@ -749,7 +752,7 @@ exit 0
             "Project Management": self.settings.get("show_project_management", True),
             "Render Management": self.settings.get("show_render_management", True),
             "Version Management": self.settings.get("show_version_management", True),
-            "Installation": self.settings.get("show_installation", True),
+
         }
 
         selected_theme = self.settings.get("selected_theme", "darkly")
@@ -779,11 +782,26 @@ exit 0
         self.apply_custom_styles()
 
 
+    def main_menu_loader_thread(self):
+        """Arka planda Main Menu tabını yükle."""
+        self.main_menu_tab = ttk.Frame(self.notebook)
+        self.after(0, lambda: self.notebook.insert(0, self.main_menu_tab, text="Main Menu"))
+    
+        thread = threading.Thread(target=self.main_menu_loader, daemon=True)
+        thread.start()
 
+        self.after(0, lambda: self.notebook.select(self.main_menu_tab))
 
+    def main_menu_loader(self):
+        """Main Menu'nun içeriğini yükle."""
+        start_time = time.time()
 
-
-
+        self.create_main_menu()
+    
+        if os.path.exists(BLENDER_ABSOLUTE_PATH):
+            self.update_blender_version_label()
+    
+        print(f"Main menu loaded in {time.time() - start_time:.2f} seconds.")
 
     def get_installed_versions(self):
         versions = []
@@ -796,23 +814,14 @@ exit 0
         """Create the GUI layout."""
         main_frame = ttkb.Frame(self, padding=(0, 0, 0, 0))
         main_frame.pack(expand=1, fill="both")
-        start_time = time.time()
+        
         self.style.configure("TNotebook.Tab", font=(self.button_font_family, 10))
         self.notebook = ttkb.Notebook(main_frame)
         self.notebook.pack(expand=1, fill="both")
 
+        threading.Thread(target=self.main_menu_loader_thread, daemon=True).start()
 
-        self.main_menu_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.main_menu_tab, text="Main Menu")
-        self.create_main_menu()
-        print(f"Main menu loaded in {time.time() - start_time:.2f} seconds.")
-        
-
-        if os.path.exists(BLENDER_PATH):
-            self.update_blender_version_label()
-
-
-
+        start_time = time.time()
         threads = []
         for tab_name, is_visible in self.tab_visibility_settings.items():
             if is_visible:
@@ -1080,41 +1089,52 @@ exit 0
 
         render_frame.columnconfigure(0, weight=1, minsize=150)  
         render_frame.columnconfigure(1, weight=4, minsize=500)  
-        render_frame.rowconfigure(0, weight=1, minsize=300)  
-
+        render_frame.rowconfigure(0, weight=1, minsize=300)
 
         # ====== Render List Section (Left side) ======
-        
-        
-
         render_list_frame = ttk.Frame(render_frame)
         render_list_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=(0, 10))
         render_list_frame.columnconfigure(0, weight=1)
         render_list_frame.rowconfigure(1, weight=1)
+        button_font_family = self.button_font_family
+        treeview_font_family = self.treeview_font_family
 
-        render_list_label = ttk.Label(render_list_frame, text="Render List", font=("Segoe UI", 14, "bold"))
-        render_list_label.grid(row=0, column=0, sticky="w", padx=5, pady=(0, 5))
-
-        self.render_tree = ttk.Treeview(
-            render_list_frame,
-            columns=("File Name", "File Size", "Resolution", "File Date"),
-            show="headings",
-            selectmode='browse'
+        style = ttk.Style()
+        style.configure(
+            "custom_render_treeview",
+            font=(treeview_font_family, 12), 
+            rowheight=25  
+        )
+        style.configure(
+            "custom_render_treeview.Heading",
+            font=(treeview_font_family, 14, "bold") 
         )
 
-        for column in ("File Name", "File Size", "Resolution", "File Date"):
-            self.render_tree.heading(column, text=column, command=lambda c=column: self.sort_treeview(c, False))
-            self.render_tree.column(column, anchor="center", stretch=True, minwidth=30)
+        render_list_label = ttk.Label(render_list_frame, text="Render List", font=(button_font_family, 14, "bold"))
+        render_list_label.grid(row=0, column=0, sticky="w", padx=5, pady=(0, 5))
+
+       
+        self.render_tree = ttk.Treeview(
+            render_list_frame,
+            columns=("File Size", "Resolution", "File Date"),
+            show="tree headings",
+            selectmode='browse',
+            style="custom_render_treeview"  
+        )
+
+        self.render_tree.heading("#0", text="Name", anchor="w") 
+        self.render_tree.column("#0", anchor="w", stretch=True, minwidth=150)
+
+        self.render_tree.heading("File Size", text="File Size", anchor="center")
+        self.render_tree.column("File Size", anchor="center", stretch=True, minwidth=100)
+
+        self.render_tree.heading("Resolution", text="Resolution", anchor="center")
+        self.render_tree.column("Resolution", anchor="center", stretch=True, minwidth=100)
+
+        self.render_tree.heading("File Date", text="File Date", anchor="center")
+        self.render_tree.column("File Date", anchor="center", stretch=True, minwidth=150)
 
         self.render_tree.grid(row=1, column=0, sticky="nsew", padx=3, pady=(0, 0))
-
-        for i in range(1, 21):
-            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
-            self.render_tree.insert('', 'end', values=("2024-01-01", f"Render_{i}.png", "1920x1080", "00:10", "10MB", "3.5.0"), tags=(tag,))
-
-        
-        self.render_tree.bind("<<TreeviewSelect>>", self.load_note_on_select)
-        self.render_tree.bind("<<TreeviewSelect>>", self.display_selected_render)
 
         render_scrollbar_y = ttk.Scrollbar(render_list_frame, orient="vertical", command=self.render_tree.yview)
         self.render_tree.configure(yscroll=render_scrollbar_y.set)
@@ -1124,53 +1144,50 @@ exit 0
         self.render_tree.configure(xscroll=render_scrollbar_x.set)
         render_scrollbar_x.grid(row=2, column=0, sticky="ew")
 
+
         right_frame = ttk.Frame(render_frame)
         right_frame.grid(row=0, column=1, sticky="nsew", padx=(5, 0), pady=(0, 10))
         right_frame.columnconfigure(0, weight=2)
         right_frame.rowconfigure(0, weight=3) 
         right_frame.rowconfigure(1, weight=1) 
 
-        
-        preview_label = ttk.Label(right_frame, text="Render Preview", font=("Segoe UI", 14, "bold"))
+        preview_label = ttk.Label(right_frame, text="Render Preview", font=(button_font_family, 14, "bold"))
         preview_label.grid(row=0, column=0, sticky="w", padx=5, pady=(0, 5))
 
-        self.preview_frame = ttk.Frame(right_frame, relief="solid", borderwidth=0, width=1000, height=800)
-        self.preview_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=(0, 10))
+        self.preview_frame = ttk.Frame(right_frame, relief="solid", borderwidth=0, width=1200, height=1000)
+        self.preview_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=(0, 0))
         self.preview_frame.columnconfigure(0, weight=1)
         self.preview_frame.rowconfigure(0, weight=1)
 
         self.preview_label = ttk.Label(self.preview_frame, text="No Preview Available", anchor="center")
         self.preview_label.grid(row=0, column=0, sticky="nsew")
-        
 
-
-        buttons_frame = ttkb.Frame(right_frame)
+        buttons_frame = ttk.Frame(right_frame) 
         buttons_frame.grid(row=2, column=0, sticky="ew", padx=3, pady=(0, 0))
-
         buttons_frame.columnconfigure((0, 1, 2, 3), weight=1, uniform="button")
 
-        open_button = ttkb.Button(buttons_frame, text="Open", takefocus=False, command=self.open_render)
+        open_button = ttk.Button(buttons_frame, text="Open", takefocus=False, command=self.open_render)
         open_button.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        refresh_button = ttkb.Button(buttons_frame, text="Refresh", takefocus=False, command=self.refresh_render_list)
+        refresh_button = ttk.Button(buttons_frame, text="Refresh", takefocus=False, command=self.refresh_render_list)
         refresh_button.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
-        browse_button = ttkb.Button(buttons_frame, text="Browse", takefocus=False, command=self.browse_render_directory)
+        browse_button = ttk.Button(buttons_frame, text="Browse", takefocus=False, command=self.browse_render_directory)
         browse_button.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
-        delete_button = ttkb.Button(buttons_frame, text="Delete", takefocus=False, command=self.delete_render)
+        delete_button = ttk.Button(buttons_frame, text="Delete", takefocus=False, command=self.delete_render)
         delete_button.grid(row=0, column=3, sticky="nsew", padx=5, pady=5)
 
-        
+        # ====== Render Notes Section (Bottom) ======
         notes_frame = ttk.Frame(render_frame)
         notes_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=5, pady=(10, 0))
         notes_frame.columnconfigure(0, weight=1)
         notes_frame.rowconfigure(1, weight=1)
 
-        notes_label = ttk.Label(notes_frame, text="Render Notes", font=("Segoe UI", 14, "bold"))
+        notes_label = ttk.Label(notes_frame, text="Render Notes", font=(button_font_family, 14, "bold"))
         notes_label.grid(row=0, column=0, sticky="w", padx=5, pady=(0, 5))
 
-        self.notes_text = tk.Text(notes_frame, height=5, wrap="word", font=("Segoe UI", 10))
+        self.notes_text = tk.Text(notes_frame, height=5, wrap="word", font=(button_font_family, 10))
         self.notes_text.grid(row=1, column=0, sticky="nsew", padx=5, pady=(0, 5))
 
         notes_scrollbar = ttk.Scrollbar(notes_frame, orient="vertical", command=self.notes_text.yview)
@@ -1184,6 +1201,11 @@ exit 0
         self.render_file_paths = {}
         self.refresh_render_list()
 
+        self.render_tree.bind("<<TreeviewSelect>>", self.display_selected_render)
+
+        self.notes_data = self._load_notes()
+
+
 
         #--------------Render Menu Methods--------------
         
@@ -1191,71 +1213,116 @@ exit 0
 
 
     def refresh_render_list(self):
-        from PIL import Image, ImageTk
-        """Refresh the Render List by reloading the current directory files."""
-        if hasattr(self, 'current_folder') and self.current_folder:
-            self.render_tree.delete(*self.render_tree.get_children())
-            self.render_file_paths.clear()
+        """Refresh the Render List by reloading the current directory files and folders in a parent-child hierarchy."""
+        from PIL import Image
 
-            if not os.path.exists(self.current_folder):
-                os.makedirs(self.current_folder, exist_ok=True)
-            for file_name in os.listdir(self.current_folder):
-                file_path = os.path.join(self.current_folder, file_name)
+        if not hasattr(self, 'current_folder') or not self.current_folder:
+            messagebox.showwarning("No Folder Loaded", "Please select a folder to load renders first.")
+            return
 
-                if os.path.isfile(file_path) and file_name.lower().endswith(('.png', '.jpeg', '.jpg', '.mp4')):
+        if not os.path.exists(self.current_folder):
+            os.makedirs(self.current_folder, exist_ok=True)
+
+        # Clear the Treeview and file paths dictionary
+        self.render_tree.delete(*self.render_tree.get_children())
+        self.render_file_paths.clear()
+        print(f"Cleared Treeview and reset file paths for folder: {self.current_folder}")
+
+        def add_items_to_treeview(parent_item, current_path):
+            """Recursive function to add items (folders and files) to the Treeview."""
+            for item_name in sorted(os.listdir(current_path)):
+                item_path = os.path.join(current_path, item_name)
+
+                if os.path.isdir(item_path): 
+                    folder_id = self.render_tree.insert(
+                        parent_item,
+                        "end",
+                        text=item_name,
+                        values=("", "", ""),  
+                        tags=('folder',)
+                    )
+                    add_items_to_treeview(folder_id, item_path)
+
+                elif os.path.isfile(item_path) and item_name.lower().endswith(('.png', '.jpeg', '.jpg', '.mp4')):
                     try:
-                        file_stats = os.stat(file_path)
+                        file_stats = os.stat(item_path)
                         file_date = datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d %H:%M')
                         file_size = f"{file_stats.st_size / (1024 * 1024):.2f} MB"
-                        file_extension = os.path.splitext(file_name)[1].lower()
+                        file_extension = os.path.splitext(item_name)[1].lower()
 
                         if file_extension in ['.png', '.jpeg', '.jpg']:
-                            with Image.open(file_path) as img:
+                            with Image.open(item_path) as img:
                                 resolution = f"{img.width}x{img.height}"
                         elif file_extension == '.mp4':
                             resolution = "N/A"
                         else:
                             resolution = "N/A"
 
-                        blender_version = "N/A" 
-
-                        item_id = self.render_tree.insert(
-                            "", 
-                            "end", 
-                            values=(file_name, file_size, resolution, file_date),
-                            tags=('evenrow' if len(self.render_tree.get_children()) % 2 == 0 else 'oddrow',)
+                        # Add file to Treeview
+                        file_id = self.render_tree.insert(
+                            parent_item,
+                            "end",
+                            text=item_name,
+                            values=(file_size, resolution, file_date),
+                            tags=('file',)
                         )
+                        # Map file path to the Treeview item
+                        self.render_file_paths[file_id] = item_path
 
-                        self.render_file_paths[item_id] = file_path
-
-                    except PermissionError:
-                        messagebox.showwarning("Permission Denied", f"Cannot access file: {file_name}")
-                        continue
                     except Exception as e:
-                        messagebox.showerror("Error", f"Error processing file {file_name}: {e}")
+                        print(f"Error processing file: {item_name}, {e}")
+                        messagebox.showerror("Error", f"Error processing file {item_name}: {e}")
                         continue
-        else:
-            messagebox.showwarning("No Folder Loaded", "Please select a folder to load renders first.")
+
+        root_item = self.render_tree.insert("", "end", text=os.path.basename(self.current_folder), open=True, tags=('folder',))
+        add_items_to_treeview(root_item, self.current_folder)
+
+        # Automatically select and display the first item if available
+        first_item = self.render_tree.get_children()
+        if first_item:
+            self.render_tree.selection_set(first_item[0])
+            self.render_tree.focus(first_item[0])
+            self.render_tree.event_generate("<<TreeviewSelect>>")
 
 
 
-    def sort_treeview(self, col, reverse):
-        """Sort Treeview columns when headers are clicked."""
-        try:
-            l = [(self.render_tree.set(k, col), k) for k in self.render_tree.get_children('')]
-            try:
-                l = [(float(re.sub('[^0-9.]', '', item[0])), item[1]) for item in l]
-            except ValueError:
-                pass  
 
-            l.sort(reverse=reverse)
 
-            for index, (val, k) in enumerate(l):
-                self.render_tree.move(k, '', index)
 
-            self.render_tree.heading(col, command=lambda: self.sort_treeview(col, not reverse))
-        except Exception as e:
-            print(f"Error sorting column {col}: {e}")
+    def sort_treeview(self, column, reverse):
+        """Sort TreeView items based on the specified column, keeping folders at the top."""
+        def is_folder(item):
+            """Check if a Treeview item is a folder."""
+            return self.render_tree.item(item, "values") == ("", "", "")
+
+        def sort_items(parent_item):
+            """Sort items under a specific parent item."""
+            items = [
+                (self.render_tree.item(item, "text" if column == "#0" else "values")[0], item)
+                for item in self.render_tree.get_children(parent_item)
+            ]
+
+            folders = [(text, item) for text, item in items if is_folder(item)]
+            files = [(text, item) for text, item in items if not is_folder(item)]
+
+            if column == "File Size":
+                files.sort(key=lambda x: float(x[0].replace(" MB", "")) if x[0] and " MB" in x[0] else 0, reverse=reverse)
+            elif column == "File Date":
+                files.sort(key=lambda x: x[0], reverse=reverse)
+            elif column == "Resolution":
+                files.sort(key=lambda x: x[0], reverse=reverse)
+            else:  # Sort by name (default for folders)
+                folders.sort(key=lambda x: x[0].lower(), reverse=reverse)
+                files.sort(key=lambda x: x[0].lower(), reverse=reverse)
+
+            sorted_items = folders + files
+            for index, (_, item) in enumerate(sorted_items):
+                self.render_tree.move(item, parent_item, index)
+                sort_items(item)
+
+        sort_items("")
+        self.render_tree.heading(column, command=lambda: self.sort_treeview(column, not reverse))
+
   
 
     def open_render(self):
@@ -1283,58 +1350,69 @@ exit 0
             
 
     def browse_render_directory(self):
+        """Open a dialog to select a folder and display files and folders in a parent-child relationship."""
         from PIL import Image, ImageTk
-        """Open a dialog to select a folder and display only PNG, JPEG, JPG, and MP4 files in the Render List."""
+
         folder_path = filedialog.askdirectory(initialdir=APPDATA_RENDER_PATH, title="Select Render Folder")
         if not folder_path:
-            return  
+            return
 
         self.current_folder = folder_path
-        self.save_render_folder_path(folder_path) 
+        self.save_render_folder_path(folder_path)
 
         self.render_tree.delete(*self.render_tree.get_children())
         self.render_file_paths.clear()
 
-        for file_name in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, file_name)
-            
-            if os.path.isfile(file_path) and file_name.lower().endswith(('.png', '.jpeg', '.jpg', '.mp4')):
-                try:
-                    file_stats = os.stat(file_path)
-                    file_date = datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d %H:%M')
-                    file_size = f"{file_stats.st_size / (1024 * 1024):.2f} MB"
-                    file_extension = os.path.splitext(file_name)[1].lower()
-                    if file_extension in ['.png', '.jpeg', '.jpg']:
-                        with Image.open(file_path) as img:
-                            resolution = f"{img.width}x{img.height}"
-                    elif file_extension == '.mp4':
-                        resolution = "N/A"
-                    else:
-                        resolution = "N/A"
-                    
-                    blender_version = "N/A" 
-
-                    item_id = self.render_tree.insert(
-                        "", 
-                        "end", 
-                        values=(file_name, file_size, resolution, file_date),
-                        tags=('evenrow' if len(self.render_tree.get_children()) % 2 == 0 else 'oddrow',)
+        def add_items(parent_item, path):
+            """Recursive function to add files and folders to the Treeview."""
+            for item_name in sorted(os.listdir(path)):
+                item_path = os.path.join(path, item_name)
+                if os.path.isdir(item_path):  
+                    folder_id = self.render_tree.insert(
+                        parent_item, "end", text=item_name, values=("", "", ""), tags=('folder',)
                     )
+                    add_items(folder_id, item_path)  # Recursively add child items
+                elif os.path.isfile(item_path) and item_name.lower().endswith(('.png', '.jpeg', '.jpg', '.mp4')):
+                    try:
+                        # Get file details
+                        file_stats = os.stat(item_path)
+                        file_date = datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d %H:%M')
+                        file_size = f"{file_stats.st_size / (1024 * 1024):.2f} MB"
+                        file_extension = os.path.splitext(item_name)[1].lower()
 
-                    self.render_file_paths[item_id] = file_path
+                        if file_extension in ['.png', '.jpeg', '.jpg']:
+                            with Image.open(item_path) as img:
+                                resolution = f"{img.width}x{img.height}"
+                        elif file_extension == '.mp4':
+                            resolution = "N/A"
+                        else:
+                            resolution = "N/A"
 
-                except PermissionError:
-                    messagebox.showwarning("Permission Denied", f"Cannot access file: {file_name}")
-                    continue
-                except Exception as e:
-                    messagebox.showerror("Error", f"Error processing file {file_name}: {e}")
-                    continue
+                        file_id = self.render_tree.insert(
+                            parent_item,
+                            "end",
+                            text=item_name,
+                            values=(file_size, resolution, file_date),
+                            tags=('file',)
+                        )
+                        self.render_file_paths[file_id] = item_path
+
+                    except PermissionError:
+                        messagebox.showwarning("Permission Denied", f"Cannot access file: {item_name}")
+                        continue
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Error processing file {item_name}: {e}")
+                        continue
+
+        root_item = self.render_tree.insert("", "end", text=os.path.basename(folder_path), open=True, tags=('folder',))
+        add_items(root_item, folder_path)
 
         first_item = self.render_tree.get_children()
         if first_item:
             self.render_tree.selection_set(first_item[0])
             self.render_tree.focus(first_item[0])
             self.render_tree.event_generate("<<TreeviewSelect>>")
+
             
 
     def get_render_folder_path(self):
@@ -1359,17 +1437,15 @@ exit 0
             print(f"Error saving render folder path: {e}")
 
 
-
-
     def display_selected_render(self, event):
         """Display the selected render in Render Preview, if it's an image, or play the video."""
         selected_item = self.render_tree.focus()
         if not selected_item:
+            messagebox.showwarning("No Selection", "Please select a render to preview.")
             return
 
-        file_path = self.render_file_paths.get(selected_item, None)
+        file_path = self.render_file_paths.get(selected_item)
         if not file_path or not os.path.exists(file_path):
-            messagebox.showerror("File Error", "The selected file does not exist.")
             self.preview_label.config(image='', text="No Preview Available")
             return
 
@@ -1382,38 +1458,81 @@ exit 0
         else:
             self.preview_label.config(image='', text="Unsupported File Type")
             messagebox.showwarning("Unsupported File", "The selected file type is not supported for preview.")
-        
+
         file_name = os.path.basename(file_path)
         self.current_render_name = file_name
         self.load_render_note(file_name)
 
 
+
+
+    def get_full_path_from_treeview(self, item_id):
+        """Reconstruct the full file path for the selected Treeview item."""
+        path_parts = []
+        while item_id:  # Traverse up to root
+            item_text = self.render_tree.item(item_id, "text")
+            path_parts.insert(0, item_text)
+            print(f"Adding path part: {item_text}")
+            item_id = self.render_tree.parent(item_id)  # Move to the parent item
+
+        full_path = os.path.join(self.current_folder, *path_parts)
+        print(f"Full path constructed: {full_path}")
+        return full_path
+
+
+
+
     def display_image_preview(self, file_path):
-        from PIL import Image, ImageTk
         """Display the selected image in the Render Preview section."""
+        from PIL import Image, ImageTk
+
         try:
             img = Image.open(file_path)
-            img.thumbnail((700, 600))  
+            print(f"Successfully opened image: {file_path}")
+
+            frame_width = self.preview_frame.winfo_width() or 500
+            frame_height = self.preview_frame.winfo_height() or 500
+            img.thumbnail((frame_width, frame_height), Image.Resampling.LANCZOS)
+
             self.render_image = ImageTk.PhotoImage(img)
+
             self.preview_label.config(image=self.render_image, text="")
-            
-            if hasattr(self, 'video_player'):
+            print("Image displayed successfully.")
+
+            if hasattr(self, 'video_player') and self.video_player:
                 self.video_player.destroy()
+
         except Exception as e:
+            print(f"Error displaying image: {e}")
             messagebox.showerror("Image Load Error", f"Could not load image: {e}")
             self.preview_label.config(image='', text="No Preview Available")
+
+
+
+
+
+
+
+
+
 
     def display_video_preview(self, file_path):
         """Launch the selected video in the default system video player."""
         try:
-            if sys.platform.startswith('darwin'):
+            if sys.platform.startswith('darwin'):  
                 subprocess.call(('open', file_path))
-            elif sys.platform.startswith('win'):
+            elif sys.platform.startswith('win'):  
                 os.startfile(file_path)
-            elif sys.platform.startswith('linux'):
+            elif sys.platform.startswith('linux'):  
                 subprocess.call(('xdg-open', file_path))
+            else:
+                messagebox.showerror("Video Playback Error", "Unsupported operating system for video playback.")
+
+        except FileNotFoundError:
+            messagebox.showerror("Video Playback Error", "The video file could not be found.")
         except Exception as e:
             messagebox.showerror("Video Playback Error", f"Could not play video: {e}")
+
 
 
 
@@ -1434,14 +1553,13 @@ exit 0
             messagebox.showwarning("No Render Selected", "Please select a render to save a note.")
            
 
-
     def delete_render(self):
         """Delete the selected render file from Render List and system if confirmed."""
         selected_item = self.render_tree.focus()
         if selected_item:
-            render_name = self.render_tree.item(selected_item, 'values')[1]  
+            render_name = self.render_tree.item(selected_item, 'text')  
             file_path = self.render_file_paths.get(selected_item)
-        
+    
             if file_path and os.path.exists(file_path):
                 confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete '{render_name}'?")
                 if confirm:
@@ -1456,6 +1574,7 @@ exit 0
                 messagebox.showwarning("File Not Found", "The selected file does not exist.")
         else:
             messagebox.showwarning("No Selection", "Please select a render to delete.")
+
             
 
 
@@ -1484,17 +1603,10 @@ exit 0
         """Load the note associated with the selected render in the Render List."""
         selected_item = self.render_tree.focus()
         if selected_item:
-            file_name = self.render_tree.item(selected_item, 'values')[0]
+            file_name = self.render_tree.item(selected_item, 'text') 
             self.current_render_name = file_name
             self.load_note_for_render(file_name)
 
-    def load_note_on_select(self, event):
-        """Load the note associated with the selected render in the Render List."""
-        selected_item = self.render_tree.focus()
-        if selected_item:
-            file_name = self.render_tree.item(selected_item, 'values')[0]
-            self.current_render_name = file_name
-            self.load_note_for_render(file_name)
 
     def load_note_for_render(self, file_name):
         """Display the note for the specified render in the text widget."""
@@ -1546,7 +1658,7 @@ exit 0
 
         self.style.configure(
             'Custom.Large.TLabel',
-            font=('Segoe UI', 14),
+            font=(button_font_family, 14),
             padding=(5, 2)          
         )
 
@@ -1568,25 +1680,18 @@ exit 0
 
         self.style.configure(
             'Custom.Small.TButton',
-            font=('Segoe UI', 10),
+            font=(button_font_family, 10),
             padding=(5, 2),
             borderwidth=0  
         )
 
         # Buttons Frame
-        buttons_frame = ttkb.Frame(self.main_menu_frame)
-        buttons_frame.grid(row=0, column=0, sticky="n", padx=(0, 10), pady=(0, 0))  
-
-        self.launch_button_shadow = ttkb.Frame(
-            buttons_frame,
-            style='Green.TButton',
-            width=15,
-            borderwidth=0  
-        )
-        self.launch_button_shadow.grid(row=1, column=0, padx=(0, 0), pady=(60, 10), sticky="ew")
+        self.buttons_frame = ttkb.Frame(self.main_menu_frame)
+        self.buttons_frame.grid(row=0, column=0, sticky="n", padx=(0, 10), pady=(5, 0))  
+        
 
         self.launch_button = ttkb.Button(
-            buttons_frame,
+            self.buttons_frame,
             text="Launch Blender",
             takefocus=False,
             command=self.launch_latest_blender,
@@ -1594,10 +1699,10 @@ exit 0
             bootstyle=SUCCESS,
             width=15
         )
-        self.launch_button.grid(row=1, column=0, pady=(55, 5), sticky="ew", ipady=5)  
+        self.launch_button.grid(row=1, column=0, pady=(30, 5), sticky="ew", ipady=5)  
 
         self.create_project_button = ttkb.Button(
-            buttons_frame,
+            self.buttons_frame,
             text="Create Project",
             takefocus=False,
             command=self.open_create_project_window,
@@ -1609,7 +1714,7 @@ exit 0
 
   
         self.update_button = ttkb.Button(
-            buttons_frame,
+            self.buttons_frame,
             text="Check Updates",
             takefocus=False,
             command=self.check_for_updates,
@@ -1621,7 +1726,7 @@ exit 0
 
        
         self.cancel_button_main = ttkb.Button(
-            buttons_frame,
+            self.buttons_frame,
             text="Cancel Download",
             takefocus=False,
             command=self.cancel_download_main,
@@ -1634,30 +1739,30 @@ exit 0
 
         self.progress_var = tk.DoubleVar()
         self.progress_bar = ttkb.Progressbar(
-            self.main_menu_frame,
+            self.buttons_frame,
             orient="horizontal",
-            length=200,  
+            length=100,  
             mode="determinate",
             variable=self.progress_var,
             bootstyle=WARNING
         )
-        self.progress_bar.grid(row=2, column=0, pady=5)
-        self.progress_bar.grid_remove()  
+        self.progress_bar.grid(row=8, column=0, pady=(4, 0), sticky="ew")  
+        self.progress_bar.grid_remove() 
         
-
-
-        self.blender_version_label = ttkb.Label(
-            self.main_menu_frame,
-            text="Blender ",
-            cursor="hand2",
-            style='Custom.Large.TLabel',
-            font=(button_font_family, 8)
+        self.progress_label = ttkb.Label(
+            self.buttons_frame,
+            text="Updating",
+            anchor="center",
+            style="Custom.Large.TLabel",
+            font=(button_font_family, 10)
         )
-        self.blender_version_label.grid(row=0, column=0, sticky="nw", padx=(5, 0), pady=(5, 0))
-        self.blender_version_label.bind("<Button-1>", self.show_main_release_notes)
+        self.progress_label.grid(row=9, column=0, sticky="ew", pady=(0, 3))
+        self.progress_label.grid_remove()
+
+
 
         self.settings_button = ttkb.Button(
-            buttons_frame,
+            self.buttons_frame,
             text="⚙️",
             takefocus=False,
             command=self.open_settings_window,
@@ -1667,7 +1772,7 @@ exit 0
         self.settings_button.grid(row=5, column=0, pady=(10, 5), sticky="w") 
         
         self.help_button = ttkb.Button(
-            buttons_frame,
+            self.buttons_frame,
             text="ℹ",
             takefocus=False,
             command=self.open_help_window, 
@@ -1695,7 +1800,7 @@ exit 0
 
         self.work_hours_label = ttkb.Label(
             projects_label_frame,
-            text="Work Time: -",
+            text="  ",
             style='Custom.Large.TLabel',
             font=(button_font_family, 12)
         )
@@ -1742,22 +1847,42 @@ exit 0
 
         self.recent_projects_tree.bind("<Double-1>", self.on_project_double_click)
 
-        spacer_frame = ttkb.Frame(buttons_frame, height=20)
-        spacer_frame.grid(row=10, column=0, pady=(180, 0))  
 
+        self.release_notes_label = ttkb.Label(
+            self.buttons_frame,
+            text="See Release Notes",
+            cursor="hand2",  
+            style="Custom.Large.TLabel",
+            font=(self.button_font_family, 10, "underline"),  
+            foreground="blue"  
+        )
+
+        self.release_notes_label.grid(row=10, column=0, pady=(10, 0), sticky="ew")
+        self.release_notes_label.grid_remove()  
+        self.progress_label.grid_forget()
+
+
+        self.bm_version_frame = ttkb.Frame(self.buttons_frame)
+        self.bm_version_frame.place(relx=0.01, rely=2.0, anchor="s")  
 
         self.bm_version_label = ttkb.Label(
-            buttons_frame,
-            text=f"Blender Manager v{DEFAULT_SETTINGS['version']}",
+            self.main_menu_frame,
+            text=f"BManager v{DEFAULT_SETTINGS['version']}",
             style='Custom.Large.TLabel',
             font=(self.button_font_family, 8)
         )
-        self.bm_version_label.grid(row=11, column=0, sticky="s", padx=(10, 0), pady=(10, 5))  
+        self.bm_version_label.place(relx=0.00005, rely=0.98, anchor="sw")
 
+        self.blender_version_label = ttkb.Label(
+            self.main_menu_frame,
+            text="Blender Not Installed",
+            cursor="hand2",
+            style='Custom.Large.TLabel',
+            font=(self.button_font_family, 8)
+        )
+        self.blender_version_label.place(relx=0.00005, rely=0.94, anchor="sw") 
+        self.blender_version_label.bind("<Button-1>", self.show_main_release_notes)
         self.update_bm_version_label()
-
-
-
 
 
     def update_blender_version_label(self):
@@ -1766,7 +1891,7 @@ exit 0
         if blender_version:
             blender_text_label = f"Blender {blender_version}"
         else:
-            blender_text_label = "Blender Not Found"  # Fallback text
+            blender_text_label = "Blender Not Installed"  # Fallback text
 
         self.blender_version_label.config(text=blender_text_label)
 
@@ -1777,13 +1902,13 @@ exit 0
         current_version = self.settings.get("version", "0.0.0")
         latest_version = self.bm_get_latest_version()
 
-        version_text = f"Blender Manager v{current_version}"
+        version_text = f"BManager v{current_version}"
     
         if latest_version and self.bm_is_new_version(current_version, latest_version):
             version_text += " ⚠️"
             self.bm_version_label.config(
                 text=version_text,
-                foreground="orange",
+                foreground="orange", 
                 cursor="hand2",
                 font=(self.button_font_family, 8, "underline")
             )
@@ -1791,13 +1916,17 @@ exit 0
         else:
             self.bm_version_label.config(
                 text=version_text,
-                foreground="green",
+                foreground="green",  
                 cursor="arrow",
                 font=(self.button_font_family, 8)
             )
             self.bm_version_label.unbind("<Button-1>")
+        self.update_idletasks()  
+
     def on_version_label_click(self, event):
+        """Handle click event on version label."""
         self.bm_check_for_updates_threaded()
+        self.update_bm_version_label()  
 
     # -------- Create Project Menu -----------
 
@@ -2016,7 +2145,7 @@ exit 0
 
     def on_window_close(self):
         self.create_project_button.config(state='normal')
-        self.create_project_window.destroy()  # Close the window
+        self.create_project_window.destroy()  
 
 
     def browse_image(self, position):
@@ -2188,8 +2317,10 @@ exit 0
         self.help_window.transient(self)
         self.help_window.grab_set()
         self.help_window.focus()
+        button_font_family = self.button_font_family
+        button_font_size = self.button_font_size
 
-        frame = ttkb.Frame(self.help_window, padding=10)
+        frame = ttkb.Frame(self.help_window, padding=0)
         frame.pack(fill='both', expand=True)
 
         notebook = ttkb.Notebook(frame)
@@ -2198,44 +2329,83 @@ exit 0
         doc_tab = ttkb.Frame(notebook)
         notebook.add(doc_tab, text="Documentation")
 
-        doc_label = ttkb.Label(doc_tab, text="Blender Manager Documentation", font=('Segoe UI', 8, 'bold'))
+        doc_label = ttkb.Label(doc_tab, text="Blender Manager Documentation", font=(button_font_family, 10, 'bold'))
         doc_label.pack(pady=(10, 0))
 
-        doc_text = tk.Text(doc_tab, wrap='word', padx=10, pady=10)
-        doc_text.insert('1.0', """Overview:
+        doc_frame = ttkb.Frame(doc_tab)
+        doc_frame.pack(fill='both', expand=True)
+
+        doc_scrollbar = ttkb.Scrollbar(doc_frame, orient="vertical")
+        doc_scrollbar.pack(side="right", fill="y")
+
+        doc_text = tk.Text(
+            doc_frame,
+            wrap='word',
+            padx=10,
+            pady=10,
+            yscrollcommand=doc_scrollbar.set
+        )
+        doc_text.insert('1.0', """
+Overview:
 
 Blender Manager is a comprehensive desktop application that allows users to:
 
-Manage multiple Blender versions and installations.
-Simplify project creation and organization.
-Automatically track project working times.
-Manage reference images and base meshes for streamlined modeling.
-Provide a UI for managing renders with notes and previews.
-Utilize an autosave feature to prevent data loss.
-Integrate with Blender through a custom addon for enhanced features.
-Manage addons for every different Blender versions easily.
+- Manage multiple Blender versions and installations.
+- Simplify project creation and organization.
+- Automatically track project working times.
+- Manage reference images and base meshes for streamlined modeling.
+- Provide a UI for managing renders with notes and previews.
+- Utilize an autosave feature to prevent data loss.
+- Integrate with Blender through a custom addon for enhanced features.
+- Manage addons for every different Blender versions easily.
 
-For detailed documentation:
-https://github.com/verlorengest/BlenderManager                       
+Additional Features:
 
-For Feedbacks and error logs:
-majinkaji@proton.me                        
+- Automatically detects new versions of Blender and installs them.
+- Cloud-based feature synchronization is planned.
+- Supports both amateur and professional workflows.
+- Includes advanced rendering management tools.
+- Collaborate and share project resources with a team.
+- Marketplace support for external assets.
+        """)
+        doc_text.config(state='disabled', font=(button_font_family, 9))
+        doc_text.pack(side="left", fill='both', expand=True)
 
-For further details, please refer to the user manual or visit our support site.""")
-        doc_text.config(state='disabled')
-        doc_text.pack(fill='both', expand=True)
+        doc_scrollbar.config(command=doc_text.yview)
+
+        detailed_doc_label = ttkb.Label(
+            doc_tab,
+            text="Detailed Documentation",
+            font=(button_font_family, 10, 'underline'),
+            foreground="blue",
+            cursor="hand2"
+        )
+        detailed_doc_label.pack(pady=(5, 0))
+        detailed_doc_label.bind("<Button-1>", lambda e: self.open_url("https://github.com/verlorengest/BlenderManager"))
+
+        feedback_label = ttkb.Label(
+            doc_tab,
+            text="For Feedbacks and error logs: majinkaji@proton.me",
+            font=(button_font_family, 9, 'italic'),
+            foreground="gray"
+        )
+        feedback_label.pack(pady=(5, 0))
+
 
         credits_tab = ttkb.Frame(notebook)
         notebook.add(credits_tab, text="Credits")
 
         credits_label = ttkb.Label(
-            credits_tab, 
+            credits_tab,
             text="Developed by verlorengest",
-            font=('Segoe UI', 10, 'italic'),
-            anchor='center'
+            font=(button_font_family, 10, 'underline'),
+            foreground="blue",
+            cursor="hand2"
         )
-        credits_label.pack(pady=(150, 10)) 
+        credits_label.pack(pady=(150, 10))
+        credits_label.bind("<Button-1>", lambda e: self.open_url("https://github.com/verlorengest"))
 
+        # Donate Tab
         donate_tab = ttkb.Frame(notebook)
         notebook.add(donate_tab, text="Donate")
 
@@ -2255,31 +2425,105 @@ For further details, please refer to the user manual or visit our support site."
                 "If you enjoy using this application,\n"
                 "consider supporting! ~ ♡"
             ),
-            anchor="center"
+            anchor="center",
+            wraplength=500,
+            font=(button_font_family, 9)
         )
         donate_label.pack(pady=(10, 20))
 
-        donate_button = ttkb.Button(donate_frame, text="Donate Now", takefocus=False, command=self.redirect_to_donation_page)
-        donate_button.pack()
+        donate_link = ttkb.Label(
+            donate_frame,
+            text="Donate Now",
+            font=(button_font_family, 10, 'underline'),
+            foreground="blue",
+            cursor="hand2"
+        )
+        donate_link.pack()
+        donate_link.bind("<Button-1>", lambda e: self.open_url("https://verlorengest.gumroad.com/l/blendermanager"))
+
         def on_close():
             self.help_button.configure(state='normal')
             self.help_window.destroy()
             del self.help_window
-            
+
         self.help_window.protocol("WM_DELETE_WINDOW", on_close)
 
         self.wait_window(self.help_window)
-    
-    def redirect_to_donation_page(self):
-        """Redirects the user to the donation page."""
+
+    def open_url(self, url):
+        """Opens the given URL in the default web browser."""
         import webbrowser
-        webbrowser.open("https://verlorengest.gumroad.com/l/blendermanager")
+        webbrowser.open(url)
 
 
         #-----------------------------------------------------------------------------------------------------------------------------------
 
 
             # -------- Main Menu Functions -----------
+
+
+
+
+
+
+    def show_main_update_release_notes(self, event=None):
+        import webview
+        import requests
+        import webbrowser
+
+        """Handles the release notes opening process when the label is clicked."""
+        version, _ = self.get_latest_blender_version() 
+
+        if not version:
+            messagebox.showerror("Error", "No valid Blender version found.")
+            return
+
+       
+        try:
+            major_version, minor_version, *_ = map(int, version.split('.'))
+        except ValueError:
+            messagebox.showerror("Error", "Invalid version format.")
+            return
+
+        
+        official_url = f"https://www.blender.org/download/releases/{major_version}.{minor_version}/"
+        alternative_url = f"https://developer.blender.org/docs/release_notes/{major_version}.{minor_version}/"
+
+        def check_url(url):
+            """Check if the given URL is accessible."""
+            try:
+                response = requests.head(url, timeout=5)
+                return response.status_code == 200
+            except Exception as e:
+                print(f"Error checking URL: {e}")
+                return False
+
+      
+        try:
+            if check_url(official_url):
+                
+                try:
+                    webview.create_window(f"Release Notes for Blender {major_version}.{minor_version}", official_url)
+                    webview.start()
+                except Exception as e:
+                    print(f"Error opening with webview: {e}. Falling back to webbrowser.")
+                    webbrowser.open(official_url)
+            elif check_url(alternative_url):
+                
+                try:
+                    webview.create_window(f"Release Notes for Blender {major_version}.{minor_version}", alternative_url)
+                    webview.start()
+                except Exception as e:
+                    print(f"Error opening with webview: {e}. Falling back to webbrowser.")
+                    webbrowser.open(alternative_url)
+            else:
+                
+                messagebox.showerror("Error", f"Release notes for Blender {major_version}.{minor_version} not found.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+           
+            webbrowser.open(official_url)
+
 
 
 
@@ -2329,7 +2573,7 @@ For further details, please refer to the user manual or visit our support site."
                 messagebox.showerror("Error", f"Release notes for Blender {major_version}.{minor_version} not found.")
         except Exception as e:
             messagebox.showerror("Error", f"An unexpected error occurred about webview: {e}")
-            webbrowser.open(official_url)  # Open official URL as a fallback
+            webbrowser.open(official_url) 
 
 
 
@@ -2367,25 +2611,67 @@ For further details, please refer to the user manual or visit our support site."
         selected_item = self.recent_projects_tree.selection()
         if selected_item:
             project_name = self.recent_projects_tree.item(selected_item[0], "values")[0]  
-            work_hours = self.project_times.get(project_name, "-")
+            work_hours = self.project_times.get(project_name, " ")
             self.work_hours_label.config(text=f"Work Time: {work_hours}")
         else:
-            self.work_hours_label.config(text="Work Time: -")
+            self.work_hours_label.config(text="Work Time: ")
 
 
 
+
+    def show_progress_bar_for_installing(self):
+        
+        self.progress_bar.grid()  
+        self.launch_button.state(['disabled'])  
+        self.update_button.state(['disabled']) 
+        self.progress_label.grid()
+        self.progress_label.config(
+            text=f"Installing Latest \n Blender Version.."
+        )
+
+
+
+
+    def hide_progress_bar_for_installing(self):
+        
+        self.progress_bar.grid_remove() 
+        self.launch_button.state(['!disabled'])  
+        self.update_button.state(['!disabled'])
+        self.progress_label.grid_remove()
+        self.progress_label.grid_forget
 
 
     def show_progress_bar(self):
         """Show progress bar and disable buttons."""
+        installed_version = self.get_installed_blender_version()
+        latest_version, _ = self.get_latest_blender_version()
+    
         self.progress_bar.grid()  
+        self.progress_label.grid()
+
+        if installed_version and latest_version:
+           
+            self.progress_label.config(
+                text=f"Updating Blender\n{installed_version} to {latest_version}"
+            )
+
+
+
+        else:
+            self.progress_label.config(
+                text="Unable to retrieve version information."
+            )
+        self.release_notes_label.grid()
         self.launch_button.state(['disabled'])  
-        self.update_button.state(['disabled'])
+        self.update_button.state(['disabled']) 
 
 
     def hide_progress_bar(self):
         """Hide progress bar and enable buttons."""
-        self.progress_bar.grid_remove() 
+        self.progress_bar.grid_remove()
+        self.release_notes_label.grid_remove()
+        self.progress_label.grid_remove()
+        self.progress_label.grid_forget
         self.launch_button.state(['!disabled'])  
         self.update_button.state(['!disabled'])
 
@@ -2619,7 +2905,7 @@ For further details, please refer to the user manual or visit our support site."
         import shutil
 
         """Downloads the Blender installer (zip or dmg) to a temporary location with progress."""
-        self.show_progress_bar()
+        self.show_progress_bar_for_installing_threadsafe()
         self.cancel_button_main.grid()
         temp_dir = tempfile.mkdtemp() 
         file_extension = download_url.split('.')[-1]  
@@ -2656,7 +2942,7 @@ For further details, please refer to the user manual or visit our support site."
             shutil.rmtree(temp_dir)  
             return None
         finally:
-            self.hide_progress_bar()  
+            self.hide_progress_bar_for_installing_threadsafe()  
             self.cancel_button_main.grid_remove()  
 
 
@@ -2735,6 +3021,45 @@ For further details, please refer to the user manual or visit our support site."
     def hide_progress_bar_threadsafe(self):
         self.main_menu_frame.after(0, self.hide_progress_bar)
         
+    def show_progress_bar_for_installing_threadsafe(self):
+        self.main_menu_frame.after(0, self.show_progress_bar_for_installing)
+
+    def hide_progress_bar_for_installing_threadsafe(self):
+        self.main_menu_frame.after(0, self.hide_progress_bar_for_installing)
+        
+
+
+    def show_handle_existing_bar_threadsafe(self):
+        self.main_menu_frame.after(0, self.show_handle_existing_bar)
+
+    def hide_handle_existing_bar_threadsafe(self):
+        self.main_menu_frame.after(0, self.show_done_text)
+        
+
+
+    def show_handle_existing_bar(self):
+        self.progress_label.grid() 
+        self.progress_label.config(
+            text=f"Transfering Your \n  Blender.."       
+            )
+        
+    def hide_handle_existing_bar(self):
+        self.progress_label.grid_remove()
+        self.progress_label.grid_forget
+
+    def show_done_text(self):
+         
+        self.progress_label.config(
+            text="Done!"      
+        )
+        self.progress_label.update_idletasks() 
+        self.main_menu_frame.after(2000, self.hide_handle_existing_bar)
+        if os.path.exists(BLENDER_ABSOLUTE_PATH):
+            self.update_blender_version_label()
+            self.refresh_recent_projects()
+            self.run_automatic_addon_setup()
+        
+
 
 
     def disable_buttons(self):
@@ -2906,12 +3231,16 @@ For further details, please refer to the user manual or visit our support site."
             latest_version, download_url = self.get_latest_blender_version()
             if latest_version and download_url:
                 self.disable_buttons()
-                self.show_progress_bar_threadsafe()
+                self.show_progress_bar_for_installing_threadsafe()
                 temp_zip_path = self.download_blender_zip(download_url)
                 if temp_zip_path:
                     self.update_blender_files(temp_zip_path)
                     self.main_menu_frame.after(0, lambda: messagebox.showinfo("Installation Complete", "Blender has been installed successfully."))
-                self.hide_progress_bar_threadsafe()
+                    if os.path.exists(BLENDER_ABSOLUTE_PATH):
+                        self.update_blender_version_label()
+                        self.refresh_recent_projects()
+                        self.run_automatic_addon_setup()
+                self.hide_progress_bar_for_installing_threadsafe()
                 self.enable_buttons()
 
         threading.Thread(target=install, daemon=True).start()
@@ -2951,7 +3280,9 @@ For further details, please refer to the user manual or visit our support site."
 
         def transfer_files(source_folder, target_folder):
             """Transfer Blender files from the source to the target folder."""
+            
             try:
+                show_loading_bar()
                 if os.path.exists(target_folder):
                     shutil.rmtree(target_folder)
                 os.makedirs(target_folder)
@@ -2969,25 +3300,24 @@ For further details, please refer to the user manual or visit our support site."
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred while transferring files: {e}")
             finally:
-                self.main_menu_frame.after(0, hide_loading_bar)
+                hide_loading_bar()
+                print("Blender Successfully Loaded !")
 
         def show_loading_bar():
             """Show a loading bar on the main menu frame."""
-            self.loading_bar = tk.Label(self.main_menu_frame, text="Loading...", font=("Segoe UI", 10))
-            self.loading_bar.grid(row=3, column=0, pady=10)
+            self.show_handle_existing_bar_threadsafe()
 
         def hide_loading_bar():
             """Hide the loading bar."""
-            if hasattr(self, 'loading_bar'):
-                self.loading_bar.destroy()
+            self.hide_handle_existing_bar_threadsafe()
 
         dialog.destroy()
+        
         self.disable_buttons()
-        show_loading_bar()
 
         selected_folder = select_and_validate_folder()
         if not selected_folder:
-            hide_loading_bar()
+            
             self.enable_buttons()
             return
 
@@ -3578,7 +3908,6 @@ For further details, please refer to the user manual or visit our support site."
             "Project Management": tk.BooleanVar(value=self.settings.get("show_project_management", True)),
             "Render Management": tk.BooleanVar(value=self.settings.get("show_render_management", True)),
             "Version Management": tk.BooleanVar(value=self.settings.get("show_version_management", True)),
-            "Installation": tk.BooleanVar(value=self.settings.get("show_installation", True)),
         }
 
         row = 0
@@ -3655,7 +3984,7 @@ For further details, please refer to the user manual or visit our support site."
 
         self.reset_defaults_button = ttkb.Button(
             button_frame,
-            text="Reset Defaults",
+            text="Reset Settings",
             takefocus=False,
             command=self.reset_to_default_settings,
             style="Small.TButton"
@@ -3723,8 +4052,49 @@ For further details, please refer to the user manual or visit our support site."
         )
         self.transfer_button.pack(anchor="w", pady=10)
 
-        self.populate_blender_versions()
+       
+        right_frame = ttk.LabelFrame(blender_settings_frame, text="Export/Import Settings", padding=(10, 10))
+        right_frame.pack(side="right", fill="y", padx=10, pady=10)
 
+        # Export Config
+        ttk.Label(right_frame, text="Select Version to Export:", font=("Segoe UI", 8)).pack(anchor="w", padx=5, pady=2)
+        self.export_version_var = tk.StringVar()
+        self.export_version_combobox = ttk.Combobox(
+            right_frame,
+            textvariable=self.export_version_var,
+            state="readonly",
+            width=25
+        )
+        self.export_version_combobox.pack(anchor="w", padx=5, pady=5)
+
+        self.export_button = ttkb.Button(
+            right_frame,
+            text="Export Config",
+            bootstyle="primary",
+            command=self.export_blender_config
+        )
+        self.export_button.pack(anchor="w", pady=10)
+
+        # Import Config
+        ttk.Label(right_frame, text="Select Version to Import:", font=("Segoe UI", 8)).pack(anchor="w", padx=5, pady=2)
+        self.import_version_var = tk.StringVar()
+        self.import_version_combobox = ttk.Combobox(
+            right_frame,
+            textvariable=self.import_version_var,
+            state="readonly",
+            width=25
+        )
+        self.import_version_combobox.pack(anchor="w", padx=5, pady=5)
+
+        self.import_button = ttkb.Button(
+            right_frame,
+            text="Import Config",
+            bootstyle="primary",
+            command=self.import_blender_config
+        )
+        self.import_button.pack(anchor="w", pady=10)
+
+        self.populate_blender_versions()
 
 
 
@@ -3736,6 +4106,98 @@ For further details, please refer to the user manual or visit our support site."
         #----------------------------------Functions ---------------------------------------------------
         
 
+    def export_blender_config(self):
+        """Export Blender settings for the selected version."""
+        version = self.export_version_var.get()
+        if not version:
+            messagebox.showerror("Error", "Please select a version to export.")
+            return
+
+        base_dir = get_blender_config_path()
+        version_path = os.path.join(base_dir, version)
+        if not os.path.exists(version_path):
+            messagebox.showerror("Error", f"Version {version} does not exist.")
+            return
+
+        selected_dir = filedialog.askdirectory(title="Select Export Directory")
+        if not selected_dir: 
+            return
+
+        export_dir = os.path.join(selected_dir, version)
+
+        if os.path.exists(export_dir):
+            shutil.rmtree(export_dir)
+        os.makedirs(export_dir)
+
+        include_addons = messagebox.askyesno(
+            "Include Add-ons?",
+            "Do you want to include add-ons in the exported settings?"
+        )
+
+        try:
+            source_config = os.path.join(version_path, "config")
+            if os.path.exists(source_config):
+                shutil.copytree(source_config, os.path.join(export_dir, "config"))
+
+            if include_addons:
+                source_scripts = os.path.join(version_path, "scripts")
+                if os.path.exists(source_scripts):
+                    shutil.copytree(source_scripts, os.path.join(export_dir, "scripts"))
+
+            messagebox.showinfo("Success", f"Settings exported for version {version} to {export_dir}.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export settings: {e}")
+
+
+
+
+
+    def import_blender_config(self):
+        """Import Blender settings to the selected version."""
+        version = self.import_version_var.get()
+        if not version:
+            messagebox.showerror("Error", "Please select a version to import to.")
+            return
+
+        base_dir = get_blender_config_path()
+        version_path = os.path.join(base_dir, version)
+        if not os.path.exists(version_path):
+            messagebox.showerror("Error", f"Version {version} does not exist.")
+            return
+
+        import_dir = filedialog.askdirectory(title="Select Import Directory")
+        if not import_dir:
+            return
+
+        include_addons = messagebox.askyesno(
+            "Include Add-ons?",
+            "Do you want to include add-ons in the imported settings?"
+        )
+
+        try:
+            # Config
+            source_config = os.path.join(import_dir, "config")
+            destination_config = os.path.join(version_path, "config")
+            if os.path.exists(source_config):
+                if os.path.exists(destination_config):
+                    shutil.rmtree(destination_config)
+                shutil.copytree(source_config, destination_config)
+
+            # Scripts (add-ons)
+            if include_addons:
+                source_scripts = os.path.join(import_dir, "scripts")
+                destination_scripts = os.path.join(version_path, "scripts")
+                if os.path.exists(source_scripts):
+                    if os.path.exists(destination_scripts):
+                        shutil.rmtree(destination_scripts)
+                    shutil.copytree(source_scripts, destination_scripts)
+
+            messagebox.showinfo("Success", f"Settings imported to version {version}.")
+            self.refresh_recent_projects()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to import settings: {e}")
+
+
 
     def populate_blender_versions(self):
         """Populate Blender versions in the comboboxes."""
@@ -3745,14 +4207,15 @@ For further details, please refer to the user manual or visit our support site."
             return
 
         versions = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+
         if versions:
             self.source_version_combobox["values"] = versions
             self.destination_version_combobox["values"] = versions
+        
+            self.export_version_combobox["values"] = versions
+            self.import_version_combobox["values"] = versions
         else:
             messagebox.showwarning("Warning", "No Blender versions available.")
-
-
-
 
 
 
@@ -3776,6 +4239,11 @@ For further details, please refer to the user manual or visit our support site."
             messagebox.showerror("Error", f"Destination version {destination_version} does not exist.")
             return
 
+        include_addons = messagebox.askyesno(
+            "Include Add-ons?",
+            "Do you want to include add-ons (scripts) in the transfer?"
+        )
+
         try:
             source_config = os.path.join(source_path, "config")
             destination_config = os.path.join(destination_path, "config")
@@ -3784,16 +4252,18 @@ For further details, please refer to the user manual or visit our support site."
                     shutil.rmtree(destination_config)
                 shutil.copytree(source_config, destination_config)
 
-            source_scripts = os.path.join(source_path, "scripts")
-            destination_scripts = os.path.join(destination_path, "scripts")
-            if os.path.exists(source_scripts):
-                if os.path.exists(destination_scripts):
-                    shutil.rmtree(destination_scripts)
-                shutil.copytree(source_scripts, destination_scripts)
+            if include_addons:
+                source_scripts = os.path.join(source_path, "scripts")
+                destination_scripts = os.path.join(destination_path, "scripts")
+                if os.path.exists(source_scripts):
+                    if os.path.exists(destination_scripts):
+                        shutil.rmtree(destination_scripts)
+                    shutil.copytree(source_scripts, destination_scripts)
 
             messagebox.showinfo("Success", f"Settings transferred from {source_version} to {destination_version}.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to transfer settings: {e}")
+
 
 
 
@@ -3822,14 +4292,10 @@ For further details, please refer to the user manual or visit our support site."
                 self.render_management_tab = ttkb.Frame(self.notebook)
                 self.notebook.add(self.render_management_tab, text="Render Management")
                 self.create_render_management_tab()
-            elif tab_name == "Version Management" and not hasattr(self, "installed_tab"):
-                self.installed_tab = ttkb.Frame(self.notebook)
-                self.notebook.add(self.installed_tab, text="Version Management")
-                self.create_installed_tab()
-            elif tab_name == "Installation" and not hasattr(self, "install_tab"):
-                self.install_tab = ttkb.Frame(self.notebook)
-                self.notebook.add(self.install_tab, text="Installation")
-                self.create_install_tab()
+            elif tab_name == "Version Management" and not hasattr(self, "version_management_tab"):
+                self.version_management_tab = ttkb.Frame(self.notebook)
+                self.notebook.add(self.version_management_tab, text="Version Management")
+                self.create_version_management_tab()
         else:  
             for index in range(self.notebook.index("end")):
                 if self.notebook.tab(index, "text") == tab_name:
@@ -4052,20 +4518,20 @@ For further details, please refer to the user manual or visit our support site."
         plist_path = os.path.expanduser("~/Library/LaunchAgents/com.blendermanager.plist")
         script_path = sys.argv[0]
         plist_content = f"""
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>Label</key>
-            <string>com.blendermanager</string>
-            <key>ProgramArguments</key>
-            <array>
-                <string>{script_path}</string>
-            </array>
-            <key>RunAtLoad</key>
-            <true/>
-        </dict>
-        </plist>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.blendermanager</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{script_path}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
         """
         with open(plist_path, 'w') as plist_file:
             plist_file.write(plist_content)
@@ -4082,14 +4548,14 @@ For further details, please refer to the user manual or visit our support site."
         desktop_file_path = os.path.join(autostart_dir, "BlenderManager.desktop")
         script_path = sys.argv[0]
         desktop_content = f"""
-        [Desktop Entry]
-        Type=Application
-        Exec=python3 {script_path}
-        Hidden=false
-        NoDisplay=false
-        X-GNOME-Autostart-enabled=true
-        Name=BlenderManager
-        Comment=Start Blender Manager on login
+[Desktop Entry]
+Type=Application
+Exec=python3 {script_path}
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name=BlenderManager
+Comment=Start Blender Manager on login
         """
         if not os.path.exists(autostart_dir):
             os.makedirs(autostart_dir)
@@ -4229,6 +4695,17 @@ For further details, please refer to the user manual or visit our support site."
 
 
 
+
+
+
+
+
+
+
+
+
+
+
     def reset_all_data(self):
         """Resets all data by deleting the ~/.BlenderManager directory and restarting the app."""
         try:
@@ -4258,8 +4735,8 @@ For further details, please refer to the user manual or visit our support site."
     def run_setup(self):
         """Runs the setup process to install and activate the addon."""
         addon_zip_names = [
-            "BlenderManager.zip", "Blender Manager.zip", 
-            "Blender_Manager.zip", "Blender Manager Addon.zip", 
+            "BlenderManager.zip", "Blender Manager.zip",
+            "Blender_Manager.zip", "Blender Manager Addon.zip",
             "Blender_Manager_Addon.zip"
         ]
 
@@ -4276,28 +4753,47 @@ For further details, please refer to the user manual or visit our support site."
             return
 
         blender_foundation_path = get_blender_config_path()
+        if not os.path.exists(blender_foundation_path):
+            messagebox.showerror("Error", "Blender Foundation folder not found. Please install Blender first.")
+            return
+
+        installed_version = self.get_installed_blender_version()
+        if not installed_version:
+            messagebox.showerror("Error", "Blender version not found. Please ensure Blender is installed.")
+            return
+
+        major_minor_version = ".".join(installed_version.split(".")[:2])
+        version_folder_path = os.path.join(blender_foundation_path, major_minor_version)
+
+        if not os.path.exists(version_folder_path):
+            os.makedirs(version_folder_path, exist_ok=True)
+            print(f"Version folder created: {version_folder_path}")
+
+        scripts_addons_path = os.path.join(version_folder_path, "scripts", "addons")
+        config_path = os.path.join(version_folder_path, "config")
+
+        os.makedirs(scripts_addons_path, exist_ok=True)
+        os.makedirs(config_path, exist_ok=True)
+
+        print(f"Config directory ensured at: {config_path}")
+        print(f"Scripts/Addons directory ensured at: {scripts_addons_path}")
+
         addon_folder_names = ["Blender Manager", "BlenderManager", "Blender_Manager"]
+        addon_folder_name = addon_folder_names[0]
+        addon_full_path = os.path.join(scripts_addons_path, addon_folder_name)
 
-        if os.path.exists(blender_foundation_path):
-            for folder in os.listdir(blender_foundation_path):
-                if os.path.isdir(os.path.join(blender_foundation_path, folder)) and folder.count(".") == 1:
-                    scripts_addons_path = os.path.join(blender_foundation_path, folder, "scripts", "addons")
-                    os.makedirs(scripts_addons_path, exist_ok=True)
+        if os.path.exists(addon_full_path):
+            print(f"Addon already exists in: {addon_full_path}. Removing old version.")
+            shutil.rmtree(addon_full_path)
 
-                    addon_folder_name = addon_folder_names[0]
-                    addon_full_path = os.path.join(scripts_addons_path, addon_folder_name)
+        self.unzip_addon(self.addon_zip_path, scripts_addons_path)
+        print(f"Addon installed in: {scripts_addons_path}")
 
-                    if os.path.exists(addon_full_path):
-                        print(f"Addon already exists in: {addon_full_path}. Removing old version.")
-                        shutil.rmtree(addon_full_path)
+        if self.activate_bm_addon(addon_folder_name):
+            messagebox.showinfo("Setup Complete", "Addon has been installed and activated successfully in all Blender versions.")
 
-                    self.unzip_addon(self.addon_zip_path, scripts_addons_path)
-                    print(f"Addon installed in: {scripts_addons_path}")
 
-            if self.activate_bm_addon(addon_folder_names[0]):
-                messagebox.showinfo("Setup Complete", "Addon has been installed and activated successfully in all Blender versions.")
-        else:
-            messagebox.showerror("Error", "Blender Foundation folder not found. You need to install Blender first.")
+
 
     def activate_bm_addon(self, addon_name):
         """Activates the addon using Blender's Python environment."""
@@ -4334,19 +4830,16 @@ print("Addon '{addon_name}' activated successfully.")
 
 
 
-
-
     def run_automatic_addon_setup(self):
         """Runs the setup process to install the addon automatically."""
+        addon_zip_names = [
+            "BlenderManager.zip", "Blender Manager.zip",
+            "Blender_Manager.zip", "Blender Manager Addon.zip",
+            "Blender_Manager_Addon.zip"
+        ]
 
-        addon_zip_names = ["BlenderManager.zip", "Blender Manager.zip", "Blender_Manager.zip"]
+        current_dir = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else __file__)
 
-        if getattr(sys, 'frozen', False):
-            current_dir = os.path.dirname(sys.executable)
-        else:
-            current_dir = os.path.dirname(__file__)
-
-        self.addon_zip_path = None
         for zip_name in addon_zip_names:
             potential_zip_path = os.path.join(current_dir, zip_name)
             if os.path.exists(potential_zip_path):
@@ -4358,33 +4851,46 @@ print("Addon '{addon_name}' activated successfully.")
             return
 
         blender_foundation_path = get_blender_config_path()
+        if not os.path.exists(blender_foundation_path):
+            print("Error: Blender Foundation folder not found. Please install Blender first.")
+            return
+
+        installed_version = self.get_installed_blender_version()
+        if not installed_version:
+            print("Error: Blender version not found. Please ensure Blender is installed.")
+            return
+
+        major_minor_version = ".".join(installed_version.split(".")[:2])
+        version_folder_path = os.path.join(blender_foundation_path, major_minor_version)
+
+        if not os.path.exists(version_folder_path):
+            os.makedirs(version_folder_path, exist_ok=True)
+            print(f"Version folder created: {version_folder_path}")
+
+        scripts_addons_path = os.path.join(version_folder_path, "scripts", "addons")
+        config_path = os.path.join(version_folder_path, "config")
+
+        os.makedirs(scripts_addons_path, exist_ok=True)
+        os.makedirs(config_path, exist_ok=True)
+
+        print(f"Config directory ensured at: {config_path}")
+        print(f"Scripts/Addons directory ensured at: {scripts_addons_path}")
 
         addon_folder_names = ["Blender Manager", "BlenderManager", "Blender_Manager"]
+        addon_folder_name = addon_folder_names[0]
+        addon_full_path = os.path.join(scripts_addons_path, addon_folder_name)
 
-        if os.path.exists(blender_foundation_path):
-            for folder in os.listdir(blender_foundation_path):
-                if os.path.isdir(os.path.join(blender_foundation_path, folder)) and folder.count(".") == 1:
-                    scripts_addons_path = os.path.join(blender_foundation_path, folder, "scripts", "addons")
-                    os.makedirs(scripts_addons_path, exist_ok=True)
+        if os.path.exists(addon_full_path):
+            print(f"Addon already exists in: {addon_full_path}. Removing old version.")
+            shutil.rmtree(addon_full_path)
 
-                    addon_full_path = None
-                    for name in addon_folder_names:
-                        potential_path = os.path.join(scripts_addons_path, name)
-                        if os.path.exists(potential_path):
-                            print(f"Addon already exists in: {potential_path}, skipping installation.")
-                            addon_full_path = potential_path
-                            break
+        self.unzip_addon(self.addon_zip_path, scripts_addons_path)
+        print(f"Addon installed in: {scripts_addons_path}")
 
-                    if not addon_full_path:
-                        addon_folder_name = addon_folder_names[0]
-                        addon_full_path = os.path.join(scripts_addons_path, addon_folder_name)
+        if self.activate_bm_addon(addon_folder_name):
+            print("Setup Complete: Addon has been installed and activated successfully in all Blender versions.")
 
-                        self.auto_unzip_addon(self.addon_zip_path, scripts_addons_path)
-                        print(f"Addon installed in: {scripts_addons_path}")
 
-            print("Setup Complete: Addon has been installed successfully in all Blender versions. Please launch Blender and activate the addon.")
-        else:
-            print("Error: Blender Foundation folder not found. Please install Blender or manually set up the addon.")
 
 
 
@@ -4525,7 +5031,26 @@ print("Addon '{addon_name}' activated successfully.")
             padding=(5, 2),
             borderwidth=0
         )
+        
 
+        treeview_font_family = self.treeview_font_family
+
+        style = ttk.Style()
+        style.configure(
+            "custom_render_treeview",
+            font=(treeview_font_family, 12), 
+            rowheight=25  
+        )
+        style.configure(
+            "custom_render_treeview.Heading",
+            font=(treeview_font_family, 14, "bold") 
+        )
+
+
+
+        style = ttkb.Style()
+        style.configure("InstallVersions.Treeview", font=(font_family, 12), rowheight=30)  
+        style.configure("InstallVersions.Treeview.Heading", font=('Segoe UI', 14, 'bold'))  
         self.style.configure("ProjectManagement.Treeview", font=(font_family, font_size), rowheight=30)
         self.style.configure("ProjectManagement.Treeview.Heading", font=(font_family, heading_font_size, 'bold'))
         self.style.configure("InstalledVersions.Treeview", font=(font_family, font_size), rowheight=30)
@@ -4594,14 +5119,6 @@ print("Addon '{addon_name}' activated successfully.")
         )
         self.browse_button.pack(side='left', padx=(0, 5))
 
-        self.go_to_button = ttk.Button(
-            directory_frame,
-            text="Go to File Path",
-            takefocus=False,
-            command=self.go_to_file_path,
-            style='Custom.TButton'
-        )
-        self.go_to_button.pack(side='left', padx=(0, 5))
 
         self.add_plugin_button = ttk.Button(
             directory_frame,
@@ -4684,19 +5201,19 @@ print("Addon '{addon_name}' activated successfully.")
 
         self.plugin_context_menu = tk.Menu(self.plugins_tree, tearoff=0)
         self.plugin_context_menu.add_command(label="Delete", command=self.remove_plugin)
+        self.plugin_context_menu.add_command(label="Go to File Path", command=self.go_to_file_path)
         self.plugin_context_menu.add_command(label="Info", command=self.view_plugin_content)
         self.plugin_context_menu.add_command(label="View Documentation", command=self.view_plugin_document)
         
-
         self.duplicate_menu = tk.Menu(self.plugin_context_menu, tearoff=0)
         
         self.activate_addon_menu = tk.Menu(self.plugin_context_menu, tearoff=0)
+        self.deactivate_addon_menu = tk.Menu(self.plugin_context_menu, tearoff=0)
         
         self.plugin_context_menu.add_cascade(label="Duplicate to...", menu=self.duplicate_menu)
-        
         self.plugin_context_menu.add_cascade(label="Activate Addon", menu=self.activate_addon_menu)
+        self.plugin_context_menu.add_cascade(label="Deactivate Addon", menu=self.deactivate_addon_menu)
 
-    
         self.plugins_tree.bind("<Button-3>", self.show_plugin_context_menu)
 
         self.refresh_plugins_list()
@@ -4709,11 +5226,10 @@ print("Addon '{addon_name}' activated successfully.")
 
             self.update_duplicate_menu()
             self.update_activate_addon_menu()
+            self.update_deactivate_addon_menu()
             self.plugin_context_menu.tk_popup(event.x_root, event.y_root)
         else:
             self.plugin_context_menu.unpost()
-
-
 
 
 
@@ -4763,71 +5279,236 @@ print("Addon '{addon_name}' activated successfully.")
             )
 
 
+    def update_deactivate_addon_menu(self):
+        """Updates the 'Deactivate Addon' submenu with available Blender versions."""
+        self.deactivate_addon_menu.delete(0, "end") 
+
+        selected_item = self.plugins_tree.focus()
+        if not selected_item:
+            messagebox.showerror("Error", "No addon selected.")
+            return
+
+        selected_values = self.plugins_tree.item(selected_item, "values")
+        if not selected_values:
+            messagebox.showerror("Error", "No addon information found.")
+            return
+
+        selected_addon = selected_values[0] 
+
+        self.deactivate_addon_menu.add_command(
+            label="Main Blender",
+            command=lambda: self.deactivate_addon_main(selected_addon)
+        )
+
+        blender_versions_dir = os.path.expanduser("~/.BlenderManager/BlenderVersions")
+
+        if not os.path.exists(blender_versions_dir):
+            messagebox.showerror("Error", f"Blender versions directory does not exist: {blender_versions_dir}")
+            return
+
+        blender_versions = [
+            folder for folder in os.listdir(blender_versions_dir)
+            if os.path.isdir(os.path.join(blender_versions_dir, folder))
+        ]
+
+        if not blender_versions:
+            self.deactivate_addon_menu.add_command(label="No versions found", state="disabled")
+            return
+
+        for version in sorted(blender_versions):
+            self.deactivate_addon_menu.add_command(
+                label=version,
+                command=lambda v=version: self.deactivate_addon(v, selected_addon)
+            )
+
+
+
+
+
+
+
+
 
     def activate_addon_main(self, selected_addon):
         """Activates the addon in Main Blender."""
-        try:
-            main_blender_path = self.get_blender_executable_path()
-            if not os.path.exists(main_blender_path):
-                raise FileNotFoundError(f"Main Blender executable not found at {main_blender_path}")
+        self.show_addon_page_message("Activating...")
 
-            script_content = f"""
+        def task():
+            try:
+                main_blender_path = self.get_blender_executable_path()
+                if not os.path.exists(main_blender_path):
+                    raise FileNotFoundError(f"Main Blender executable not found at {main_blender_path}")
+
+                script_content = f"""
 import bpy
 bpy.ops.preferences.addon_enable(module="{selected_addon}")
 bpy.ops.wm.save_userpref()
 print("Addon '{selected_addon}' activated successfully.")
-"""
+    """
 
-            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py", encoding="utf-8") as temp_script:
-                temp_script_path = temp_script.name
-                temp_script.write(script_content)
+                with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py", encoding="utf-8") as temp_script:
+                    temp_script_path = temp_script.name
+                    temp_script.write(script_content)
 
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0  # SW_HIDE
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0  # SW_HIDE
 
-            subprocess.run(
-                [main_blender_path, "--background", "--python", temp_script_path],
-                check=True,
-                startupinfo=startupinfo
-            )
+                subprocess.run(
+                    [main_blender_path, "--background", "--python", temp_script_path],
+                    check=True,
+                    startupinfo=startupinfo
+                )
+                self.hide_addon_page_message()
+                messagebox.showinfo("Success", f"Addon '{selected_addon}' activated successfully in Main Blender.")
 
-            messagebox.showinfo("Success", f"Addon '{selected_addon}' activated successfully in Main Blender.")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to activate addon in Main Blender: {e}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to activate addon in Main Blender: {e}")
+                self.hide_addon_page_message()
+
+        self.version_combobox.master.after(100, task)
 
     def activate_addon(self, selected_version, selected_addon):
-        """Activates the addon in a specific Blender version."""
-        try:
-            base_path = os.path.expanduser(f"~/.BlenderManager/BlenderVersions/{selected_version}")
-            blender_path = os.path.join(base_path, "blender.exe" if os.name == "nt" else "blender")
-            if not os.path.exists(blender_path):
-                raise FileNotFoundError(f"Blender executable not found for version {selected_version} at {blender_path}")
+        self.show_addon_page_message("Activating...")
 
-            script_content = f"""
+        def task():
+            try:
+                base_path = os.path.expanduser(f"~/.BlenderManager/BlenderVersions/{selected_version}")
+                blender_path = os.path.join(base_path, "blender.exe" if os.name == "nt" else "blender")
+                if not os.path.exists(blender_path):
+                    raise FileNotFoundError(f"Blender executable not found for version {selected_version} at {blender_path}")
+
+                script_content = f"""
 import bpy
 bpy.ops.preferences.addon_enable(module="{selected_addon}")
 bpy.ops.wm.save_userpref()
 print("Addon '{selected_addon}' activated successfully.")
-"""
+    """
 
-            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py", encoding="utf-8") as temp_script:
-                temp_script_path = temp_script.name
-                temp_script.write(script_content)
+                with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py", encoding="utf-8") as temp_script:
+                    temp_script_path = temp_script.name
+                    temp_script.write(script_content)
 
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0  # SW_HIDE
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
 
-            subprocess.run(
-                [blender_path, "--background", "--python", temp_script_path],
-                check=True,
-                startupinfo=startupinfo
-            )
+                subprocess.run(
+                    [blender_path, "--background", "--python", temp_script_path],
+                    check=True,
+                    startupinfo=startupinfo
+                )
 
-            messagebox.showinfo("Success", f"Addon '{selected_addon}' activated successfully in Blender version {selected_version}.")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to activate addon in Blender version {selected_version}: {e}")
+                self.hide_addon_page_message()
+                messagebox.showinfo("Success", f"Addon '{selected_addon}' activated successfully in Blender version {selected_version}.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to activate addon in Blender version {selected_version}: {e}")
+                self.hide_addon_page_message()
+
+        self.version_combobox.master.after(100, task)
+
+
+
+    def deactivate_addon_main(self, selected_addon):
+        self.show_addon_page_message("Deactivating...")
+
+        def task():
+            try:
+                main_blender_path = self.get_blender_executable_path()
+                if not os.path.exists(main_blender_path):
+                    raise FileNotFoundError(f"Main Blender executable not found at {main_blender_path}")
+
+                script_content = f"""
+import bpy
+bpy.ops.preferences.addon_disable(module="{selected_addon}")
+bpy.ops.wm.save_userpref()
+print("Addon '{selected_addon}' deactivated successfully.")
+    """
+
+                with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py", encoding="utf-8") as temp_script:
+                    temp_script_path = temp_script.name
+                    temp_script.write(script_content)
+
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
+                subprocess.run(
+                    [main_blender_path, "--background", "--python", temp_script_path],
+                    check=True,
+                    startupinfo=startupinfo
+                )
+
+                self.hide_addon_page_message()
+                messagebox.showinfo("Success", f"Addon '{selected_addon}' deactivated successfully in Main Blender.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to deactivate addon in Main Blender: {e}")
+                self.hide_addon_page_message()
+
+        self.version_combobox.master.after(100, task)
+
+
+    def deactivate_addon(self, selected_version, selected_addon):
+        self.show_addon_page_message("Deactivating...")
+
+        def task():
+            try:
+                base_path = os.path.expanduser(f"~/.BlenderManager/BlenderVersions/{selected_version}")
+                blender_path = os.path.join(base_path, "blender.exe" if os.name == "nt" else "blender")
+                if not os.path.exists(blender_path):
+                    raise FileNotFoundError(f"Blender executable not found for version {selected_version} at {blender_path}")
+
+                script_content = f"""
+import bpy
+bpy.ops.preferences.addon_disable(module="{selected_addon}")
+bpy.ops.wm.save_userpref()
+print("Addon '{selected_addon}' deactivated successfully.")
+    """
+
+                with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".py", encoding="utf-8") as temp_script:
+                    temp_script_path = temp_script.name
+                    temp_script.write(script_content)
+
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
+                subprocess.run(
+                    [blender_path, "--background", "--python", temp_script_path],
+                    check=True,
+                    startupinfo=startupinfo
+                )
+
+                self.hide_addon_page_message()
+                messagebox.showinfo("Success", f"Addon '{selected_addon}' deactivated successfully in Blender version {selected_version}.")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to deactivate addon in Blender version {selected_version}: {e}")
+                self.hide_addon_page_message()
+
+        self.version_combobox.master.after(100, task)
+
+
+
+    def show_addon_page_message(self, message):
+        """Show a temporary message next to the go to file path buttons."""
+        if hasattr(self, 'activating_label'):
+            return  
+
+        self.activating_label = ttk.Label(self.version_combobox.master, text=f"{message}", foreground="green")
+        self.activating_label.pack(side='left', padx=(10, 0))
+
+    def hide_addon_page_message(self):
+        """Hide the temporary message."""
+        if hasattr(self, 'activating_label'):
+            self.activating_label.destroy()
+            del self.activating_label
+
+
+
+
+
+
+
 
 
 
@@ -5413,14 +6094,6 @@ print("Addon '{selected_addon}' activated successfully.")
         )
         self.project_browse_button.pack(side='left', padx=(0, 5))
 
-        self.project_go_to_button = ttk.Button(
-            project_directory_frame,
-            text="Go to File Path",
-            takefocus=False,
-            command=self.go_to_project_file_path,
-            style='Custom.TButton'
-        )
-        self.project_go_to_button.pack(side='left', padx=(0, 5))
         
         self.add_project_button = ttk.Button(
             project_directory_frame,
@@ -5514,6 +6187,7 @@ print("Addon '{selected_addon}' activated successfully.")
         self.context_menu = tk.Menu(self.projects_tree, tearoff=0)
         self.context_menu.add_command(label="Open", command=self.open_project_from_context)
         self.context_menu.add_command(label="Rename", command=self.rename_project_from_context)
+        self.context_menu.add_command(label="Go to File Path", command=self.go_to_project_file_path)
         self.context_menu.add_command(label="Delete", command=self.remove_project_from_context)
         self.context_menu.add_command(label="Export", command=self.export_project_from_context)
         self.context_menu.add_command(label="Info", command=self.view_project_content_from_context)
@@ -6243,20 +6917,46 @@ elif '{export_format}' == 'abc':
             self.refresh_projects_list()
 
     def go_to_project_file_path(self):
-        """Open the current project directory in the file explorer."""
-        directory = self.project_directory_path.get()
-        if os.path.exists(directory):
+        """Open the directory of the selected project in the file explorer."""
+        selected_item = self.projects_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Warning", "No project selected.")
+            return
+
+        project_path = self.get_item_project_folder_path(selected_item[0]) 
+        if os.path.exists(project_path):
             try:
                 if os.name == 'nt':
-                    os.startfile(directory)
+                    os.startfile(project_path)
                 elif sys.platform == 'darwin':
-                    subprocess.Popen(['open', directory])
+                    subprocess.Popen(['open', project_path])
                 else:
-                    subprocess.Popen(['xdg-open', directory])
+                    subprocess.Popen(['xdg-open', project_path])
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to open directory: {e}")
         else:
             messagebox.showwarning("Warning", "The selected directory does not exist.")
+
+
+
+    def get_item_project_folder_path(self, item_id):
+        """Get the folder path of a TreeView item."""
+        parts = []
+        while item_id:
+            item_text = self.projects_tree.item(item_id, "text")
+            parts.insert(0, item_text)
+            item_id = self.projects_tree.parent(item_id)
+    
+        full_path = os.path.join(self.project_directory_path.get(), *parts)
+
+        if os.path.isfile(full_path):
+            return os.path.dirname(full_path)
+        return full_path
+
+
+
+
+
 
     def view_project_content(self):
         import datetime as dt
@@ -6402,121 +7102,257 @@ elif '{export_format}' == 'abc':
   #------------------------------------------------------------#      
 
 
-    def create_installed_tab(self):
-        installed_frame = ttk.Frame(self.installed_tab, padding=(10, 10, 10, 10))
-        installed_frame.pack(expand=1, fill='both')
+    def create_version_management_tab(self):
+        
+        self.versions_parent_frame = ttkb.Frame(self.version_management_tab, padding=(10, 0, 0, 0))
+        self.versions_parent_frame.pack(expand=1, fill='both')
+        
+        self.create_install_view()
+        self.create_installed_view()
+ 
+        
+        self.toggle_button_frame = ttkb.Frame(self.version_management_tab)
+        self.toggle_button_frame.place(relx=0.0, rely=1.0, anchor='sw')  
+    
+        self.toggle_button = ttkb.Button(
+            self.toggle_button_frame,
+            text="Show Installed Versions",
+            takefocus=False,
+            command=self.toggle_views,
+            bootstyle="secondary"
+        )
+        self.toggle_button.pack(padx=10, pady=10)
 
-        buttons_frame = ttk.Frame(installed_frame)
-        buttons_frame.pack(side='left', padx=(10, 10), fill='y')
+        self.show_install_view()
+        self.showing_install = True
+    
+    def create_install_view(self):
+        self.install_frame = ttkb.Frame(self.versions_parent_frame, padding=(0, 0, 0, 0))
+        
+        left_frame = ttkb.Frame(self.install_frame)
+        left_frame.pack(side='left', fill='y', padx=(0, 10), pady=(0, 10))
+        
+        right_frame = ttkb.Frame(self.install_frame)
+        right_frame.pack(side='right', expand=1, fill='both')
+        button_font_family = self.button_font_family
+        button_font_size = self.button_font_size
+        font_family = self.treeview_font_family
+        font_size = self.treeview_font_size
+        os_frame = ttkb.Frame(left_frame)
+        os_frame.pack(fill='x', pady=(0, 10))
+        
+        self.os_label = ttkb.Label(
+            os_frame,
+            text="Select Operating System:",
+            font=(button_font_family, 10, 'bold')
+        )
+        self.os_label.pack(side='top', padx=(10, 10))
+        
+        self.os_combobox = ttkb.Combobox(
+            os_frame,
+            values=["Windows", "macOS", "Linux"],
+            state='readonly',
+            font=(button_font_family, 10),
+            bootstyle="primary"
+        )
+        self.os_combobox.set("Select OS")
+        self.os_combobox.pack(fill='x', padx=(10, 10))
+        self.os_combobox.bind("<<ComboboxSelected>>", self.on_os_selected)
+        
+        self.win_arch_combobox = ttkb.Combobox(
+            os_frame,
+            values=["32-bit", "64-bit"],
+            state='readonly',
+            font=(button_font_family, 10),
+            bootstyle="primary"
+        )
+        self.win_arch_combobox.set("Select Architecture")
+        self.win_arch_combobox.pack(fill='x',padx=(10, 10))
+        self.win_arch_combobox.pack_forget()  
+        
+        self.arch_combobox = ttkb.Combobox(
+            os_frame,
+            values=["Intel", "Apple Silicon"],
+            state='readonly',
+            font=(button_font_family, 10),
+            bootstyle="primary"
+        )
+        self.arch_combobox.set("Select Architecture")
+        self.arch_combobox.pack(fill='x', padx=(10, 10))
+        self.arch_combobox.pack_forget()  
+        
+        buttons_frame = ttkb.Frame(left_frame)
+        buttons_frame.pack(fill='x', pady=(0, 10))
+        
+        self.get_stable_btn = ttkb.Button(
+            buttons_frame,
+            text="Get Stable Versions",
+            takefocus=False,
+            command=self.get_stable_versions,
+            bootstyle="primary"
+        )
+        self.get_stable_btn.pack(fill='x', pady=(5, 5), padx=(10, 10))
+        
+        self.get_unstable_btn = ttkb.Button(
+            buttons_frame,
+            text="Get Unstable Versions",
+            takefocus=False,
+            command=self.get_unstable_versions,
+            bootstyle="primary"
+        )
+        self.get_unstable_btn.pack(fill='x', pady=(5, 5), padx=(10, 10))
+        
+        self.install_btn = ttkb.Button(
+            left_frame,
+            text="Install",
+            takefocus=False,
+            command=self.install_version,
+            bootstyle="primary"
+        )
+        self.install_btn.pack(fill='x', pady=(5, 10), padx=(10, 10))
+        
+        # Install Progress Frame
+        self.install_progress_frame = ttkb.Frame(left_frame)
+        self.install_progress_label = ttkb.Label(
+            self.install_progress_frame,
+            text="Download Progress:",
+            font=('Helvetica', 10)
+        )
+        self.install_progress_label.pack(side='top', padx=(10, 10))
+        
+        self.install_progress_var = tk.DoubleVar()
+        self.install_progress_bar = ttkb.Progressbar(
+            self.install_progress_frame,
+            variable=self.install_progress_var,
+            maximum=100,
+            bootstyle="primary-striped"
+        )
+        self.install_progress_bar.pack(fill='x', expand=1)
+        
+        self.install_progress_frame.pack(fill='x', pady=(5, 10), padx=(10, 10))
+        self.install_progress_frame.pack_forget()
+        
+        self.cancel_button = ttkb.Button(
+            left_frame,
+            text="Cancel",
+            takefocus=False,
+            command=self.cancel_installation,
+            bootstyle="danger"
+        )
+        self.cancel_button.pack(fill='x', pady=(5, 10), padx=(10, 10))
+        self.cancel_button.pack_forget()
+        
+        self.release_notes_btn = ttkb.Button(
+            left_frame,
+            text="Release Notes",
+            takefocus=False,
+            command=self.show_release_notes,
+            bootstyle="info"
+        )
+        self.release_notes_btn.pack(fill='x', pady=(5, 10), padx=(10, 10))
+        self.release_notes_btn.config(state='disabled')  
+        style = ttkb.Style()
+        style.configure("InstallVersions.Treeview", font=(font_family, 12), rowheight=30)  
+        style.configure("InstallVersions.Treeview.Heading", font=('Segoe UI', 14, 'bold'))  
+        
+        self.tree = ttkb.Treeview(right_frame, columns=("Version", "Release Date"), show="headings", height=20, style="InstallVersions.Treeview")
+        self.tree.heading("Version", text="Blender Version", command=lambda: self.sort_treeview_column_installation_tab("Version"))
+        self.tree.heading("Release Date", text="Release Date", command=lambda: self.sort_treeview_column_installation_tab("Release Date"))
+        self.tree.column("Version", anchor="center")
+        self.tree.column("Release Date", anchor="center")
+        self.tree.pack(expand=1, fill='both', padx=0, pady=0)
+        self.tree.bind("<<TreeviewSelect>>", self.on_treeview_select_install_tab)
+        self.download_links = {}
+    
+    def create_installed_view(self):
+        self.installed_frame = ttkb.Frame(self.versions_parent_frame, padding=(0, 0, 0, 0))
+        self.installed_frame.pack(fill='both', expand=True)
+        button_font_family = self.button_font_family
+        button_font_size = self.button_font_size
+        font_family = self.treeview_font_family
+        font_size = self.treeview_font_size
+        buttons_frame = ttkb.Frame(self.installed_frame)
+        buttons_frame.pack(side='left', padx=(0, 10), pady=(0, 0), fill='y')
 
-        self.launch_installed_button = ttk.Button(
+        self.launch_installed_button = ttkb.Button(
             buttons_frame,
             text="Launch",
             takefocus=False,
-            compound='left',
-            padding=(15, 10),
+            padding=(30, 10),
             command=self.launch_blender,
             style='Custom.TButton'
         )
-        self.launch_installed_button.pack(pady=(0, 10), fill='x')
+        self.launch_installed_button.pack(pady=(10, 10), padx=(10, 10), fill='x')
 
         self.launch_factory_var = tk.BooleanVar()
         self.launch_factory_check = ttk.Checkbutton(
             buttons_frame,
-            text="Launch with Factory Settings",
+            text="Factory Settings",
             variable=self.launch_factory_var
         )
-        self.launch_factory_check.pack(pady=(0, 10), fill='x')
+        self.launch_factory_check.pack(pady=(5, 5), padx=(10, 10), fill='x')
 
-        self.create_shortcut_button = ttk.Button(
-            buttons_frame,
-            text="Create Shortcut",
-            takefocus=False,
-            command=self.create_shortcut_for_selected_version,
-            padding=(15, 10),
-            style='Custom.TButton'
-        )
-        self.create_shortcut_button.pack(pady=(0, 10), fill='x')
-
-
-        # Remove Button
-        self.remove_button = ttk.Button(
-            buttons_frame,
-            text="Remove",
-            takefocus=False,
-            compound='left',
-            padding=(15, 10),
-            command=self.remove_installed_version,
-            style='Custom.TButton'
-        )
-        self.remove_button.pack(pady=(0, 10), fill='x')
-
-        # Refresh Button
-        self.refresh_button = ttk.Button(
+        self.refresh_button = ttkb.Button(
             buttons_frame,
             text="Refresh",
             takefocus=False,
             command=self.refresh_installed_versions,
-            padding=(15, 10),
+            padding=(30, 10),
             style='Custom.TButton'
         )
-        self.refresh_button.pack(pady=(0, 10), fill='x')
-        
+        self.refresh_button.pack(pady=(10, 10), padx=(10, 10), fill='x')
 
-        # Refresh Button
-        self.transfer_to_menu_button = ttk.Button(
+        self.transfer_to_menu_button = ttkb.Button(
             buttons_frame,
-            text="Convert To Main Launch",
+            text="Convert To Main",
             takefocus=False,
             command=self.transfer_version_to_menu,
-            padding=(15, 10),
+            padding=(30, 10),
             style='Custom.TButton'
         )
-        self.transfer_to_menu_button.pack(pady=(0, 10), fill='x')
-
-
-
-
+        self.transfer_to_menu_button.pack(pady=(10, 10), padx=(10, 10), fill='x')
 
         style = ttkb.Style()
-        self.style.configure("InstalledVersions.Treeview", font=('Segoe UI', 12), rowheight=30)  
-        self.style.configure("InstalledVersions.Treeview.Heading", font=('Segoe UI', 14, 'bold'))  
-
+        style.configure("InstalledVersions.Treeview", font=(font_family, font_size), rowheight=30)
+        style.configure("InstalledVersions.Treeview.Heading", font=('Segoe UI', 14, 'bold'))
 
         self.installed_versions_tree = ttkb.Treeview(
-            installed_frame,
+            self.installed_frame,
             columns=('Version',),
             show='headings',
             selectmode='browse',
             height=17,
-            style='InstalledVersions.Treeview'  
+            style='InstalledVersions.Treeview'
         )
         self.installed_versions_tree.heading('Version', text='Installed Versions')
         self.installed_versions_tree.column('Version', width=300, anchor='center')
-        self.installed_versions_tree.pack(side='right', fill='both', expand=1, padx=(20, 0))
+        self.installed_versions_tree.pack(side='right', fill='both', expand=1, padx=(0, 0))
 
-
-        self.installed_versions_tree.bind('<<TreeviewSelect>>', self.on_version_select)
-
-
-        self.file_path_label = ttk.Label(self.installed_tab, text="", font=('Helvetica', 10))
-        self.file_path_label.pack(pady=(10, 5), anchor='w', padx=20)
-
-        self.go_to_button = ttk.Button(
-            self.installed_tab,
-            text="Go to File Path",
-            takefocus=False,
-            command=self.open_file_location,
-            style='Custom.TButton',
-            padding=(15, 10)
-        )
-        self.go_to_button.pack(pady=(0, 10))
-        self.go_to_button.pack_forget() 
-
+        self.versions_context_menu = tk.Menu(self.installed_versions_tree, tearoff=0)
+        self.versions_context_menu.add_command(label="Create Shortcut", command=self.create_shortcut)
+        self.versions_context_menu.add_command(label="Delete", command=self.remove_installed_version)
+        self.installed_versions_tree.bind("<Button-3>", self.show_installed_context_menu)
 
         self.refresh_installed_versions()
 
-
+    
+    def show_install_view(self):
+        self.installed_frame.pack_forget()
+        self.install_frame.pack(expand=1, fill='both')
+        self.toggle_button.configure(text="Installed Versions")
+        self.showing_install = True
+    
+    def show_installed_view(self):
+        self.install_frame.pack_forget()
+        self.installed_frame.pack(expand=1, fill='both')
+        self.toggle_button.configure(text="Install a Version")
+        self.showing_install = False
+    
+    def toggle_views(self):
+        if self.showing_install:
+            self.show_installed_view()
+        else:
+            self.show_install_view()
 
         
 
@@ -6526,8 +7362,87 @@ elif '{export_format}' == 'abc':
 
 
 
-    def create_shortcut_for_selected_version (self):
-        print("created")
+    def show_installed_context_menu(self, event):
+        """Displays the context menu for the selected item in the Treeview."""
+        item_id = self.installed_versions_tree.identify_row(event.y)
+    
+        if item_id:  
+            self.installed_versions_tree.selection_set(item_id) 
+            self.versions_context_menu.post(event.x_root, event.y_root)  
+            self.versions_context_menu.unpost()  
+
+
+
+
+
+    def create_shortcut(self):
+        """Create a shortcut for the selected Blender version."""
+        selected_item = self.installed_versions_tree.focus()
+
+        if not selected_item:
+            self.after(0, lambda: messagebox.showwarning("Warning", "Please select a Blender version to make a shortcut."))
+            return
+
+        selected_version = self.installed_versions_tree.item(selected_item)['values'][0]
+
+        blender_dir = os.path.join(BLENDER_DIR, selected_version)
+
+        if platform.system() == "Darwin":  # macOS
+            blender_exec = os.path.join(blender_dir, "Blender.app", "Contents", "MacOS", "Blender")
+        else:
+            blender_exec = os.path.join(blender_dir, "blender")
+            if platform.system() == "Windows":
+                blender_exec += ".exe"
+
+        if not os.path.isfile(blender_exec):
+            self.after(0, lambda: messagebox.showerror("Error", f"Blender executable not found in {blender_dir}"))
+            return
+
+        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop") 
+
+        shortcut_name = f"{selected_version}.lnk" if platform.system() == "Windows" else f"{selected_version}"
+        shortcut_path = os.path.join(desktop_path, shortcut_name)
+
+        try:
+            if platform.system() == "Windows":
+                self.create_windows_shortcut(shortcut_path, blender_exec, blender_dir)
+            elif platform.system() == "Darwin": 
+                self.create_mac_shortcut(shortcut_path, blender_exec)
+            elif platform.system() == "Linux":
+                self.create_linux_shortcut(shortcut_path, blender_exec)
+            else:
+                raise OSError("Unsupported operating system")
+
+            self.after(0, lambda: messagebox.showinfo("Success", f"Shortcut created: {shortcut_path}"))
+        except Exception as error:
+            error_message = str(error) 
+            self.after(0, lambda: messagebox.showerror("Error", f"Failed to create shortcut.\n{error_message}"))
+
+
+    def create_windows_shortcut(self, shortcut_path, target_path, working_directory):
+        import winshell
+        with winshell.shortcut(shortcut_path) as shortcut:
+            shortcut.path = target_path
+            shortcut.working_directory = working_directory
+            shortcut.description = "Shortcut to Blender"
+            shortcut.icon_location = target_path, 0
+
+    def create_mac_shortcut(self, shortcut_path, target_path):
+        os.symlink(target_path, shortcut_path) 
+
+    def create_linux_shortcut(self, shortcut_path, target_path):
+        shortcut_path += ".desktop"
+        with open(shortcut_path, "w") as shortcut_file:
+            shortcut_file.write(f"""
+[Desktop Entry]
+Type=Application
+Name={os.path.basename(shortcut_path)}
+Exec={target_path}
+Icon={target_path}
+Terminal=false
+    """)
+        os.chmod(shortcut_path, 0o755) 
+
 
     def transfer_version_to_menu(self):
     
@@ -6548,7 +7463,6 @@ elif '{export_format}' == 'abc':
         
             try:
                 self.main_menu_frame.after(0, self.disable_buttons)
-                self.remove_button.configure(state='disabled')
                 self.transfer_to_menu_button.configure(state='disabled', text='Transfering...')
                 print(f"Transfering {source_folder} to {target_folder} ")
             
@@ -6571,9 +7485,12 @@ elif '{export_format}' == 'abc':
                 print("Process Finished")
                 self.main_menu_frame.after(0, self.enable_buttons)
                 self.transfer_to_menu_button.configure(state='disabled', text='Complete ! ')
-                self.remove_button.configure(state='normal')
                 time.sleep(1)
-                self.transfer_to_menu_button.configure(state='normal', text='Convert To Main Launch')
+                self.transfer_to_menu_button.configure(state='normal', text='Convert To Main')
+                if os.path.exists(BLENDER_ABSOLUTE_PATH):
+                    self.update_blender_version_label()
+                    self.refresh_recent_projects()
+                    self.run_automatic_addon_setup()
 
         threading.Thread(target=transfer_files, args=(source_folder, target_folder), daemon=True).start()
             
@@ -6583,8 +7500,6 @@ elif '{export_format}' == 'abc':
     def disable_installed_tab_buttons(self):
         self.transfer_to_menu_button.configure(state='disabled')
         self.launch_installed_button.configure(state='disabled')
-        self.create_shortcut_button.configure(state='disabled')
-        self.remove_button.configure(state='disabled')
         self.refresh_button.configure(state='disabled')
         
 
@@ -6592,8 +7507,6 @@ elif '{export_format}' == 'abc':
     def enable_installed_tab_buttons(self):
         self.transfer_to_menu_button.configure(state='normal')
         self.launch_installed_button.configure(state='normal')
-        self.create_shortcut_button.configure(state='normal')
-        self.remove_button.configure(state='normal')
         self.refresh_button.configure(state='normal')
         
 
@@ -6627,7 +7540,6 @@ elif '{export_format}' == 'abc':
 
         print(f"Launching Blender version {selected_version} from: {blender_exec}")
 
-        self.remove_button.configure(state='disabled')
         self.launch_installed_button.configure(state='disabled')
         self.after(5000, lambda: self.launch_installed_button.configure(state='normal'))
 
@@ -6641,14 +7553,12 @@ elif '{export_format}' == 'abc':
 
             def monitor_process():
                 process.wait()
-                self.remove_button.configure(state='normal')
                 print(f"Blender version {selected_version} has exited.")
 
             threading.Thread(target=monitor_process, daemon=True).start()
 
         except Exception as e:
             self.after(0, lambda: messagebox.showerror("Error", f"Failed to launch Blender: {e}"))
-            self.remove_button.configure(state='normal')
 
             
 
@@ -6693,12 +7603,9 @@ elif '{export_format}' == 'abc':
         selected_item = self.installed_versions_tree.focus()
         if selected_item:
             selected_version = self.installed_versions_tree.item(selected_item)['values'][0]
-            path = os.path.join(BLENDER_DIR, selected_version)
-            self.file_path_label.config(text=f"Path: {path}")
-            self.go_to_button.pack(pady=5)
         else:
-            self.file_path_label.config(text="")
-            self.go_to_button.pack_forget()
+            
+            print("error432423")
 
     def open_file_location(self):
         selected_item = self.installed_versions_tree.focus()
@@ -6740,152 +7647,6 @@ elif '{export_format}' == 'abc':
                 self.after(0, lambda: messagebox.showerror("Error", f"Failed to remove {selected_version}: {e}"))
                 self.enable_installed_tab_buttons()
 
-
-        #--------------------------------------------------------------------------------#
-
-
-
-
-    # -------------------------------------------------#
-    # --------------INSTALLATION TAB-------------------#
-    # -------------------------------------------------#
-
-    def create_install_tab(self):
-        install_frame = ttkb.Frame(self.install_tab, padding=(20, 20, 20, 20))
-        install_frame.pack(expand=1, fill='both')
-
-        left_frame = ttkb.Frame(install_frame)
-        left_frame.pack(side='left', fill='y', padx=(0, 10), pady=(0, 10))
-
-        right_frame = ttkb.Frame(install_frame)
-        right_frame.pack(side='right', expand=1, fill='both')
-
-        os_frame = ttkb.Frame(left_frame)
-        os_frame.pack(fill='x', pady=(0, 10))
-
-        self.os_label = ttkb.Label(
-            os_frame,
-            text="Select Operating System:",
-            font=('Helvetica', 10, 'bold')
-        )
-        self.os_label.pack(side='top', padx=(0, 10))
-
-        self.os_combobox = ttkb.Combobox(
-            os_frame,
-            values=["Windows", "macOS", "Linux"],
-            state='readonly',
-            font=('Helvetica', 10),
-            bootstyle="primary"
-        )
-        self.os_combobox.set("Select OS")
-        self.os_combobox.pack(fill='x', padx=(0, 10))
-        self.os_combobox.bind("<<ComboboxSelected>>", self.on_os_selected)
-
-        self.win_arch_combobox = ttkb.Combobox(
-            os_frame,
-            values=["32-bit", "64-bit"],
-            state='readonly',
-            font=('Helvetica', 10),
-            bootstyle="primary"
-        )
-        self.win_arch_combobox.set("Select Architecture")
-        self.win_arch_combobox.pack(fill='x', pady=(5, 10), padx=(0, 10))
-        self.win_arch_combobox.pack_forget()  
-
-        self.arch_combobox = ttkb.Combobox(
-            os_frame,
-            values=["Intel", "Apple Silicon"],
-            state='readonly',
-            font=('Helvetica', 10),
-            bootstyle="primary"
-        )
-        self.arch_combobox.set("Select Architecture")
-        self.arch_combobox.pack(fill='x', pady=(5, 10), padx=(0, 10))
-        self.arch_combobox.pack_forget()  
-
-        buttons_frame = ttkb.Frame(left_frame)
-        buttons_frame.pack(fill='x', pady=(0, 10))
-
-        self.get_stable_btn = ttkb.Button(
-            buttons_frame,
-            text="Get Stable Versions",
-            takefocus=False,
-            command=self.get_stable_versions,
-            bootstyle="primary"
-        )
-        self.get_stable_btn.pack(fill='x', pady=(5, 5), padx=(0, 10))
-
-        self.get_unstable_btn = ttkb.Button(
-            buttons_frame,
-            text="Get Unstable Versions",
-            takefocus=False,
-            command=self.get_unstable_versions,
-            bootstyle="primary"
-        )
-        self.get_unstable_btn.pack(fill='x', pady=(5, 5), padx=(0, 10))
-
-        self.install_btn = ttkb.Button(
-            left_frame,
-            text="Install",
-            takefocus=False,
-            command=self.install_version,
-            bootstyle="primary"
-        )
-        self.install_btn.pack(fill='x', pady=(5, 10), padx=(0, 10))
-
-        self.install_progress_frame = ttkb.Frame(left_frame)
-        self.install_progress_label = ttkb.Label(
-            self.install_progress_frame,
-            text="Download Progress:",
-            font=('Helvetica', 10)
-        )
-        self.install_progress_label.pack(side='top', padx=(0, 10))
-
-        self.install_progress_var = tk.DoubleVar()
-        self.install_progress_bar = ttkb.Progressbar(
-            self.install_progress_frame,
-            variable=self.install_progress_var,
-            maximum=100,
-            bootstyle="primary-striped"
-        )
-        self.install_progress_bar.pack(fill='x', expand=1)
-
-        self.install_progress_frame.pack(fill='x', pady=(5, 10), padx=(0, 10))
-        self.install_progress_frame.pack_forget()
-
-        self.cancel_button = ttkb.Button(
-            left_frame,
-            text="Cancel",
-            takefocus=False,
-            command=self.cancel_installation,
-            bootstyle="danger"
-        )
-        self.cancel_button.pack(fill='x', pady=(5, 10), padx=(0, 10))
-        self.cancel_button.pack_forget()
-        
-        self.release_notes_btn = ttkb.Button(
-            left_frame,
-            text="Release Notes",
-            takefocus=False,
-            command=self.show_release_notes,
-            bootstyle="info"
-        )
-        self.release_notes_btn.pack(fill='x', pady=(5, 10), padx=(0, 10))
-        self.release_notes_btn.config(state='disabled')  
-        
-        self.tree = ttkb.Treeview(right_frame, columns=("Version", "Release Date"), show="headings", height=20, style="Custom.Treeview")
-        self.tree.heading("Version", text="Blender Version", command=lambda: self.sort_treeview_column_installation_tab("Version"))
-        self.tree.heading("Release Date", text="Release Date", command=lambda: self.sort_treeview_column_installation_tab("Release Date"))
-        self.tree.column("Version", anchor="center")
-        self.tree.column("Release Date", anchor="center")
-        self.tree.pack(expand=True, fill="both")
-        self.tree.bind("<<TreeviewSelect>>", self.on_treeview_select_install_tab)
-        self.download_links = {}
-
-
-
-    # ----Functions----
-    
 
 
     def sort_treeview_column_installation_tab(self, column_name):
@@ -6972,7 +7733,7 @@ elif '{export_format}' == 'abc':
                     messagebox.showerror("Error", f"Release notes for Blender {major_version}.{minor_version} not found.")
             except Exception as e:
                 messagebox.showerror("Error", f"An unexpected error occurred about webview: {e}")
-                webbrowser.open(official_url)  # Open official URL as a fallback
+                webbrowser.open(official_url) 
         else:
             messagebox.showerror("Error", "Invalid version format.")
         
@@ -7003,11 +7764,11 @@ elif '{export_format}' == 'abc':
             )
 
         if selected_os == "Windows":
-            self.win_arch_combobox.pack(side='left', padx=(0, 10))
+            self.win_arch_combobox.pack(fill='x',padx=(10, 10))
             self.arch_combobox.pack_forget()
         elif selected_os == "macOS":
             self.win_arch_combobox.pack_forget()
-            self.arch_combobox.pack(side='left', padx=(0, 10))
+            self.arch_combobox.pack(fill='x', padx=(10, 10))
         else:
             self.win_arch_combobox.pack_forget()
             self.arch_combobox.pack_forget()
@@ -7030,7 +7791,7 @@ elif '{export_format}' == 'abc':
         asyncio.set_event_loop(loop)
         loop.run_until_complete(self.async_fetch_stable_versions())
         loop.close()
-        self.install_tab.after(0, self.reset_get_stable_button)
+        self.version_management_tab.after(0, self.reset_get_stable_button)
 
     async def async_fetch_stable_versions(self):
         import ssl
