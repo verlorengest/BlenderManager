@@ -422,6 +422,7 @@ python blender_manager.py
 ## Additional Notes
 - Ensure you have **Blender** installed or configure the application to detect an existing Blender installation. If Blender is not installed, the app will prompt you to install it.
 - The application may require elevated permissions to access certain directories or system settings, depending on your operating system.
+- **themes** Folder should be inside of \Lib\site-packages\ttkbootstrap
 - For further assistance or issues, please open a ticket on the [GitHub Issues Page](https://github.com/verlorengest/BlenderManager/issues).
 
 ---
