@@ -2,7 +2,7 @@ bl_info = {
     "name": "Blender Manager",
     "description": "Essential Blender addon for Blender Manager.",
     "author": "verlorengest",
-    "version": (1, 0, 2),
+    "version": (1, 0, 3),
     "blender": (4, 2, 0),  #  4.0.0 + 
     "location": "File > External Tools > Blender Manager",
     "category": "System",
@@ -14,7 +14,8 @@ import os
 import time
 from bpy.app.handlers import persistent
 from . import blender_manager_operator
-from .blender_manager_operator import load_autosaved_projects, activate_autosave, restart_autosave
+from .blender_manager_operator import load_autosave_settings
+
 
 
 
@@ -137,25 +138,7 @@ def on_load_post_handler(dummy):
             project_path = filepath
             project_open_time = current_time
             print(f"[Blender Manager] Project loaded: {project_path} at {time.ctime(project_open_time)}")
-
-            autosaved_projects = load_autosaved_projects()
-            if filepath in autosaved_projects:
-                autosave_data = autosaved_projects[filepath]
-                bpy.context.scene.auto_saver_interval = autosave_data['autosave_interval']
-                bpy.context.scene.auto_saver_directory = autosave_data['autosave_directory']
-                bpy.context.scene.auto_saver_unique_names = autosave_data['autosave_unique_names']
-                restart_autosave()
-                print(f"[Blender Manager] Autosave settings applied for project: {filepath}")
-
-                if not bpy.context.scene.auto_saver_running:
-                    bpy.context.scene.auto_saver_running = True
-                    result = bpy.ops.wm.auto_saver_operator('INVOKE_DEFAULT')
-                    print(f"[Blender Manager] AutoSaver operator started: {result}")
-                else:
-                    print("[Blender Manager] AutoSaver is already running.")
-            else:
-                print("[Blender Manager] No autosave settings found for this project.")
-
+            load_autosave_settings()
             project_path = filepath
             project_open_time = current_time
             print(f"[Blender Manager] Project loaded: {project_path} at {time.ctime(project_open_time)}")
@@ -199,11 +182,6 @@ def register():
         project_open_time = time.time()
         print(f"[Blender Manager] Existing project detected: {project_path} at {time.ctime(project_open_time)}")
 
-        autosaved_projects = load_autosaved_projects()
-        if project_path in autosaved_projects:
-            autosave_data = autosaved_projects[project_path]
-            activate_autosave(autosave_data)
-            print(f"[Blender Manager] Autosave settings applied for project: {project_path}")
     else:
         project_path = None
         project_open_time = time.time()
