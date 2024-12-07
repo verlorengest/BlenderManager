@@ -105,7 +105,7 @@ def enable_dark_mode(hwnd):
 
 CONFIG_FILE_PATH = os.path.join(os.path.expanduser("~"), ".BlenderManager", "config.json")
 DEFAULT_SETTINGS = {
-    "version": "1.0.0",
+    "version": "1.0.1",
     "selected_theme": "darkly",
     "auto_update_checkbox": True,
     "bm_auto_update_checkbox": False,
@@ -1799,7 +1799,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.bm_check_for_updates_threaded()
         self.update_bm_version_label()  
 
-    # -------- Create Project Menu -----------
+    # --------Create Project Menu-----------
 
 
 
@@ -1810,6 +1810,8 @@ class BlenderManagerApp(TkinterDnD.Tk):
         """Opens a new window for creating a project."""
         self.create_project_button.config(state='disabled')
     
+        user_input_data = self.load_user_input_data()
+
         self.create_project_window = tk.Toplevel(self)
         self.create_project_window.title("Create Project")
         self.create_project_window.geometry("700x500")
@@ -1835,6 +1837,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
         settings_tab = ttkb.Frame(notebook)
         notebook.add(settings_tab, text="Settings")
 
+        # --- Reference Images ---
         ref_label = ttkb.Label(ref_images_tab, text="Reference Images", font=('Segoe UI', 14, 'bold'))
         ref_label.pack(pady=(10, 0))
         warning_label = ttkb.Label(ref_images_tab, text="Images should be in the same size", font=('Segoe UI', 10, 'italic'))
@@ -1849,11 +1852,14 @@ class BlenderManagerApp(TkinterDnD.Tk):
             label = ttkb.Label(images_frame, text=f"{position} Image:")
             label.grid(row=idx * 2, column=0, sticky='e', pady=5)
             entry = ttkb.Entry(images_frame, width=50)
+            entry_value = user_input_data.get('reference_images', {}).get(position.lower(), '')
+            entry.insert(0, entry_value)
             entry.grid(row=idx * 2, column=1, pady=5, sticky='w')
             self.reference_images[position.lower()] = entry
             browse_button = ttkb.Button(images_frame, text="Browse", command=lambda pos=position.lower(): self.browse_image(pos))
             browse_button.grid(row=idx * 2, column=2, padx=5, pady=5)
 
+        # --- Base Mesh ---
         base_mesh_label = ttkb.Label(base_mesh_tab, text="Base Mesh", font=('Segoe UI', 14, 'bold'))
         base_mesh_label.pack(pady=(10, 10))
         base_mesh_frame = ttkb.Frame(base_mesh_tab)
@@ -1867,156 +1873,102 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.base_mesh_combobox['values'] = list(self.base_meshes.keys())
         self.base_mesh_combobox.grid(row=0, column=1, pady=5, sticky='w')
 
+        base_mesh_saved = user_input_data.get('base_mesh', '')
+        if base_mesh_saved in self.base_meshes:
+            self.base_mesh_var.set(base_mesh_saved)
+
         add_base_mesh_button = ttkb.Button(base_mesh_frame, text="Add Base Mesh", takefocus=False, command=self.open_add_base_mesh_window)
         add_base_mesh_button.grid(row=1, column=1, pady=10, sticky='w')
 
+        # --- Settings ---
         settings_label = ttkb.Label(settings_tab, text="Settings", font=('Segoe UI', 14, 'bold'))
         settings_label.pack(pady=(10, 10))
 
         settings_frame = ttkb.LabelFrame(settings_tab, text="Project Settings", padding=10)
         settings_frame.pack(fill='both', expand=True, padx=20)
 
-        self.add_light_var = tk.BooleanVar()
+        self.add_light_var = tk.BooleanVar(value=user_input_data.get('add_light', False))
         add_light_checkbox = ttkb.Checkbutton(settings_frame, text="Add Light", variable=self.add_light_var)
         add_light_checkbox.grid(row=0, column=0, sticky='w', padx=10, pady=5)
 
-        self.add_camera_var = tk.BooleanVar()
+        self.add_camera_var = tk.BooleanVar(value=user_input_data.get('add_camera', False))
         add_camera_checkbox = ttkb.Checkbutton(settings_frame, text="Add Camera", variable=self.add_camera_var)
         add_camera_checkbox.grid(row=1, column=0, sticky='w', padx=10, pady=5)
 
-        self.activate_autosaver_var = tk.BooleanVar()
-        activate_autosaver_checkbox = ttkb.Checkbutton(
+        project_name_label = ttkb.Label(settings_frame, text="Project Name:")
+        project_name_label.grid(row=6, column=0, sticky='w', padx=10, pady=5)
+
+        self.project_name_var = tk.StringVar(value=user_input_data.get('project_name', ''))
+        self.project_name_entry = ttkb.Entry(settings_frame, textvariable=self.project_name_var, width=30)
+        self.project_name_entry.grid(row=6, column=1, sticky='w', padx=10, pady=5)
+
+        project_directory_label = ttkb.Label(settings_frame, text="Project Directory:")
+        project_directory_label.grid(row=7, column=0, sticky='w', padx=10, pady=5)
+
+        self.project_directory_var = tk.StringVar(value=user_input_data.get('project_dir', ''))
+        self.project_directory_entry = ttkb.Entry(settings_frame, textvariable=self.project_directory_var, width=30, state='disabled')
+        self.project_directory_entry.grid(row=7, column=1, sticky='w', padx=10, pady=5)
+
+        browse_button = ttkb.Button(settings_frame, text="Browse", takefocus=False, command=self.browse_setproject_directory)
+        browse_button.grid(row=7, column=2, sticky='w', padx=5, pady=5)
+    
+        self.auto_save_project_var = tk.BooleanVar(value=user_input_data.get('auto_save_project', False))
+        auto_save_project_checkbox = ttkb.Checkbutton(settings_frame, text="Auto Save", variable=self.auto_save_project_var, command=self.toggle_autosave_settings)
+        auto_save_project_checkbox.grid(row=2, column=0, sticky='w', padx=10, pady=5)
+
+        autosave_style_label = ttkb.Label(settings_frame, text="Autosave Style:")
+        autosave_style_label.grid(row=3, column=0, sticky='w', padx=10, pady=5)
+
+        self.auto_save_style_var = tk.StringVar(value=user_input_data.get('auto_save_style', 'overwrite'))
+        self.autosave_style_combobox = ttkb.Combobox(settings_frame, textvariable=self.auto_save_style_var, values=["overwrite", "separate"], state='disabled')
+        self.autosave_style_combobox.grid(row=3, column=1, sticky='w', padx=10, pady=5)
+
+        autosave_interval_label = ttkb.Label(settings_frame, text="Autosave Interval:")
+        autosave_interval_label.grid(row=4, column=0, sticky='w', padx=10, pady=5)
+
+        saved_interval = user_input_data.get('auto_save_interval', '5 minutes')
+        self.auto_save_interval_var = tk.StringVar(value=saved_interval)
+        self.autosave_interval_combobox = ttkb.Combobox(
             settings_frame,
-            text="Enable Autosave",
-            variable=self.activate_autosaver_var,
-            command=self.toggle_autosave_options
-        )
-        activate_autosaver_checkbox.grid(row=2, column=0, sticky='w', padx=10, pady=5)
-
-        self.autosave_interval_var = tk.IntVar(value=300) 
-        interval_label = ttkb.Label(settings_frame, text="Autosave Interval (seconds):")
-        interval_label.grid(row=3, column=0, sticky='w', padx=10, pady=5)
-
-        self.interval_entry = ttkb.Entry(settings_frame, textvariable=self.autosave_interval_var, state='disabled')
-        self.interval_entry.grid(row=3, column=1, sticky='w', padx=10, pady=5)
-
-        interval_options = {
-            "1 Minute": 60,
-            "5 Minutes": 300,
-            "10 Minutes": 600,
-            "30 Minutes": 1800,
-            "1 Hour": 3600,
-            "2 Hours": 7200,
-            "3 Hours": 10800,
-            "4 Hours": 14400,
-            "5 Hours": 18000,
-            "6 Hours": 21600,
-        }
-
-        self.interval_combobox = ttkb.Combobox(
-            settings_frame,
-            values=list(interval_options.keys()),
+            textvariable=self.auto_save_interval_var,
+            values=["5 minutes", "15 minutes", "30 minutes", "1 hour", "2 hours", "3 hours", "6 hours", "12 hours", "24 hours"],
             state='disabled'
         )
-        self.interval_combobox.set("5 Minutes") 
-        self.interval_combobox.grid(row=3, column=2, sticky='w', padx=10, pady=5)
+        self.autosave_interval_combobox.grid(row=4, column=1, sticky='w', padx=10, pady=5)
 
-        def update_interval_entry(event=None):
-            selected_interval = interval_options[self.interval_combobox.get()]
-            self.autosave_interval_var.set(selected_interval)
-
-        self.interval_combobox.bind("<<ComboboxSelected>>", update_interval_entry)
-
-
-        default_directory = os.path.expanduser("~/.BlenderManager") 
-        self.autosave_directory_var = tk.StringVar()
-        self.autosave_directory_var.set(default_directory)  
-
-        directory_label = ttkb.Label(settings_frame, text="Autosave Directory:")
-        directory_label.grid(row=4, column=0, sticky='w', padx=10, pady=5)
-
-        self.directory_entry = ttkb.Entry(
-            settings_frame,
-            textvariable=self.autosave_directory_var,
-            width=30,
-            state='readonly'
-        )
-        self.directory_entry.grid(row=4, column=1, sticky='w', padx=10, pady=5)
-
-        browse_directory_button = ttkb.Button(
-            settings_frame,
-            text="Browse",
-            command=self.browse_autosave_directory,
-            state='disabled'
-        )
-        browse_directory_button.grid(row=4, column=2, padx=10, pady=5)
-
-        self.autosave_unique_names_var = tk.BooleanVar()
-        self.unique_names_checkbox = ttkb.Checkbutton(
-            settings_frame,
-            text="Save as Different Files Each Time",
-            variable=self.autosave_unique_names_var,
-            state='disabled'
-        )
-        self.unique_names_checkbox.grid(row=5, column=0, sticky='w', padx=10, pady=5, columnspan=2)
-
-
-
-
-        self.autosave_directory_var = tk.StringVar()
-        directory_label = ttkb.Label(settings_frame, text="Autosave Directory:")
-        directory_label.grid(row=4, column=0, sticky='e', pady=5)
-
-        self.directory_entry = ttkb.Entry(settings_frame, textvariable=self.autosave_directory_var, width=30, state='disabled')
-        self.directory_entry.grid(row=4, column=1, sticky='w', pady=5)
-
-        self.browse_directory_button = ttkb.Button(settings_frame, text="Browse", command=self.browse_autosave_directory, state='disabled')
-        self.browse_directory_button.grid(row=4, column=2, padx=5, pady=5)
+        self.toggle_autosave_settings()
 
         self.create_button = ttkb.Button(self.create_project_window, text="Create Project", takefocus=False, command=self.create_project)
         self.create_button.pack(pady=10)
-        
-
 
         self.create_project_window.protocol("WM_DELETE_WINDOW", self.on_window_close)
 
-
-
-
-    def toggle_autosave_options(self):
-        """Enable or disable autosave options based on the checkbox state."""
-        default_directory = os.path.expanduser("~/.BlenderManager")
-
-        if self.activate_autosaver_var.get():
-            self.interval_entry.config(state='readonly')
-            self.interval_combobox.config(state='readonly')
-            self.directory_entry.config(state='readonly')
-            self.browse_directory_button.config(state='normal')
-            self.unique_names_checkbox.config(state='normal')
-
-            if not self.autosave_directory_var.get():  
-                self.autosave_directory_var.set(default_directory)
-        else:
-            self.interval_entry.config(state='disabled')
-            self.interval_combobox.config(state='disabled')
-            self.directory_entry.config(state='disabled')
-            self.browse_directory_button.config(state='disabled')
-            self.unique_names_checkbox.config(state='disabled')
-
-            self.autosave_directory_var.set("")
-
-
-
-
-    def browse_autosave_directory(self):
-        """Opens a file dialog to select an autosave directory."""
-        directory = filedialog.askdirectory(title="Select Autosave Directory")
+    def browse_setproject_directory(self):
+        directory = filedialog.askdirectory(title="Select Project Directory")
         if directory:
-            self.autosave_directory_var.set(directory)
+            self.project_directory_var.set(directory)
+
+    def toggle_autosave_settings(self):
+        """Enables or disables autosave-related settings based on the checkbox state."""
+        state = 'normal' if self.auto_save_project_var.get() else 'disabled'
+        self.autosave_style_combobox.config(state=state)
+        self.autosave_interval_combobox.config(state=state)
+        
+
+    def convert_interval_to_seconds(self, interval_str):
+        """Converts interval string like '5 minutes' to seconds."""
+        if "minute" in interval_str:
+            return int(interval_str.split()[0]) * 60
+        elif "hour" in interval_str:
+            return int(interval_str.split()[0]) * 3600
+        else:
+            return 300  
+
 
     def on_window_close(self):
+        self.save_user_input_data()
         self.create_project_button.config(state='normal')
-        self.create_project_window.destroy()  
+        self.create_project_window.destroy()
 
 
     def browse_image(self, position):
@@ -2030,59 +1982,89 @@ class BlenderManagerApp(TkinterDnD.Tk):
             self.reference_images[position].insert(0, file_path)
 
     def create_project(self):
-        """Collects the input data, writes them to a JSON file, and initiates the project creation."""
-
         self.create_button.config(state="disabled", text="Loading...")
 
         def perform_project_creation():
             try:
-                images = {}
-                for position, entry in self.reference_images.items():
-                    path = entry.get()
-                    if path:
-                        images[position] = path
-
-
+                images = {position: entry.get() for position, entry in self.reference_images.items() if entry.get()}
                 base_mesh_name = self.base_mesh_var.get()
                 base_mesh_path = self.base_meshes.get(base_mesh_name, '')
                 add_light = self.add_light_var.get()
                 add_camera = self.add_camera_var.get()
-                activate_autosave = self.activate_autosaver_var.get()
-                autosave_interval = self.autosave_interval_var.get()
-                autosave_directory = self.autosave_directory_var.get()
-                autosave_unique_names = self.autosave_unique_names_var.get()
+                project_name = self.project_name_var.get()
+                project_dir = self.project_directory_var.get()
+                auto_save_project = self.auto_save_project_var.get()
+                auto_save_interval = self.auto_save_interval_var.get()
+                auto_save_style = self.auto_save_style_var.get()
+
+                interval_in_seconds = self.convert_interval_to_seconds(auto_save_interval) if auto_save_project else None
+
                 data = {
                     'reference_images': images,
-                    'base_mesh': {
-                        'name': base_mesh_name,
-                        'path': base_mesh_path
-                    },
+                    'base_mesh': {'name': base_mesh_name, 'path': base_mesh_path},
                     'add_light': add_light,
                     'add_camera': add_camera,
-                    'activate_autosave': activate_autosave,
-                    'autosave_interval': autosave_interval,
-                    'autosave_directory': autosave_directory,
-                    'autosave_unique_names': autosave_unique_names
+                    'project_name': project_name,
+                    'project_dir': project_dir,
+                    'auto_save_project': auto_save_project,
+                    'auto_save_interval': interval_in_seconds,
+                    'auto_save_style': auto_save_style
                 }
 
-                home_dir = os.path.expanduser('~')
-                settings_dir = os.path.join(home_dir, '.BlenderManager', 'mngaddon')
+                settings_dir = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'mngaddon')
                 settings_file = os.path.join(settings_dir, 'settings.json')
-
                 os.makedirs(settings_dir, exist_ok=True)
 
-                with open(settings_file, 'w') as f:
-                    json.dump(data, f)
+                with open(settings_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=4)
+
+                self.save_user_input_data()
 
                 time.sleep(2)
-
                 self.launch_latest_blender()
             finally:
                 self.create_button.config(state="normal", text="Create Project")
                 self.create_project_window.destroy()
                 self.create_project_button.config(state='normal')
+
         threading.Thread(target=perform_project_creation, daemon=True).start()
 
+
+    def save_user_input_data(self):
+        """Saves the user input fields to a JSON file so they can be remembered next time."""
+        settings_dir = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'mngaddon')
+        user_input_file = os.path.join(settings_dir, 'user_input.json')
+        os.makedirs(settings_dir, exist_ok=True)
+
+        data = {
+            'reference_images': {pos: entry.get() for pos, entry in self.reference_images.items()},
+            'base_mesh': self.base_mesh_var.get(),
+            'add_light': self.add_light_var.get(),
+            'add_camera': self.add_camera_var.get(),
+            'project_name': self.project_name_var.get(),
+            'project_dir': self.project_directory_var.get(),
+            'auto_save_project': self.auto_save_project_var.get(),
+            'auto_save_interval': self.auto_save_interval_var.get(),
+            'auto_save_style': self.auto_save_style_var.get(),
+        }
+
+        with open(user_input_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
+
+
+    def load_user_input_data(self):
+        """Loads previously saved user inputs from a JSON file."""
+        settings_dir = os.path.join(os.path.expanduser("~"), '.BlenderManager', 'mngaddon')
+        user_input_file = os.path.join(settings_dir, 'user_input.json')
+
+        if os.path.exists(user_input_file):
+            try:
+                with open(user_input_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return data
+            except:
+                return {}
+        return {}
 
 
 
@@ -3246,7 +3228,7 @@ Additional Features:
                     self.disable_buttons(launch_button_text="Running")
 
                     if platform.system() == "Windows":
-                        process = subprocess.Popen([blender_exe], creationflags=subprocess.CREATE_NO_WINDOW)
+                        process = subprocess.Popen([blender_exe],creationflags=subprocess.CREATE_NO_WINDOW)
                     else:
                         process = subprocess.Popen([blender_exe])
 
@@ -5088,7 +5070,7 @@ print("Addon '{addon_name}' activated successfully.")
             )
             return True  
         except subprocess.CalledProcessError as e:
-            messagebox.showerror("Error", f"Failed to activate addon. Error: {e}")
+            print(f"Failed to activate addon. Error: {e}")
             return False  
         finally:
             if os.path.exists(temp_script_path):
@@ -6880,13 +6862,15 @@ elif '{export_format}' == 'abc':
         self.after(0, lambda: messagebox.showinfo("Success", message))
 
 
-
     def show_exporting_message(self):
-        """Show a temporary 'Exporting...' message next to the go to file path buttons."""
+        """Show a temporary 'Exporting...' message."""
         if hasattr(self, 'exporting_label'):
             return  
 
-        self.exporting_label = ttk.Label(self.project_directory_entry.master, text="Exporting...", foreground="red")
+
+        parent_widget = self  
+
+        self.exporting_label = ttk.Label(parent_widget, text="Exporting...", foreground="red")
         self.exporting_label.pack(side='left', padx=(10, 0))
 
     def hide_exporting_message(self):
@@ -7103,7 +7087,7 @@ elif '{export_format}' == 'abc':
         selected_item = self.projects_tree.focus()
         if selected_item:
             project_path = self.get_item_full_path(selected_item)
-            if os.path.isfile(project_path) and project_path.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
+            if os.path.isfile(project_path) and project_path.lower().endswith(('.blend', '.blend1', '.blend11', '.blend111')):
                 try:
                     startupinfo = subprocess.STARTUPINFO()
                     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW  
@@ -7156,7 +7140,7 @@ elif '{export_format}' == 'abc':
         try:
             destination = self.project_directory_path.get()
 
-            if os.path.isfile(project_dir) and project_dir.lower().endswith(('.blend', '.blend1', '.blend2', '.blend3')):
+            if os.path.isfile(project_dir) and project_dir.lower().endswith(('.blend', '.blend1', '.blend2', '.blend11', '.blend3')):
                 shutil.copy(project_dir, destination)
                 print(f"Copied .blend file to {destination}")
 
@@ -7606,6 +7590,132 @@ with open(data_path, 'w', encoding='utf-8') as f:
 
         return thumbnail_image, meshes, total_vertex_count, materials, textures
 
+    def export_selected_material(self, materials_listbox, project_path):
+        import tempfile
+        import subprocess
+        import os
+        from tkinter import messagebox, filedialog
+
+        selected_indices = materials_listbox.curselection()
+        if not selected_indices:
+            messagebox.showwarning("Warning", "No material selected.")
+            return
+        selected_material = materials_listbox.get(selected_indices[0])
+
+        filetypes = [
+            ("Blender File", "*.blend"),
+            ("FBX File", "*.fbx"),
+            ("OBJ File", "*.obj"),
+            ("Substance Archive", "*.sbsar"),
+            ("All Files", "*.*"),
+        ]
+
+        export_path = filedialog.asksaveasfilename(
+            defaultextension=".blend",
+            filetypes=filetypes,
+            title="Save Material As"
+        )
+        if not export_path:
+            return
+
+        try:
+            blender_exe_path = self.get_blender_executable_path()
+            if not blender_exe_path:
+                messagebox.showerror("Error", "Blender executable path not found.")
+                return
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+                script_path = os.path.join(temp_dir, 'export_material.py')
+
+                _, ext = os.path.splitext(export_path)
+                ext = ext.lower()
+
+                if ext == ".blend":
+                    script_content = f'''
+import bpy
+
+blend_file_path = r"{project_path}"
+material_name = r"{selected_material}"
+export_path = r"{export_path}"
+
+bpy.ops.wm.read_factory_settings(use_empty=True)
+
+with bpy.data.libraries.load(blend_file_path, link=False) as (data_from, data_to):
+    if material_name in data_from.materials:
+        data_to.materials = [material_name]
+    else:
+        print(f"Material {{material_name}} not found in the blend file.")
+        exit()
+
+bpy.ops.wm.save_as_mainfile(filepath=export_path)
+    '''
+                elif ext == ".fbx" or ext == ".obj":
+                    script_content = f'''
+import bpy
+
+blend_file_path = r"{project_path}"
+material_name = r"{selected_material}"
+export_path = r"{export_path}"
+
+bpy.ops.wm.read_factory_settings(use_empty=True)
+
+bpy.ops.mesh.primitive_cube_add()
+obj = bpy.context.active_object
+
+with bpy.data.libraries.load(blend_file_path, link=False) as (data_from, data_to):
+    if material_name in data_from.materials:
+        data_to.materials = [material_name]
+    else:
+        print(f"Material {{material_name}} not found in the blend file.")
+        exit()
+
+mat = bpy.data.materials.get(material_name)
+if mat:
+    if obj.data.materials:
+        obj.data.materials[0] = mat
+    else:
+        obj.data.materials.append(mat)
+
+if export_path.lower().endswith(".fbx"):
+    bpy.ops.export_scene.fbx(
+        filepath=export_path,
+        use_selection=True,
+        embed_textures=True
+    )
+elif export_path.lower().endswith(".obj"):
+    bpy.ops.export_scene.obj(
+        filepath=export_path,
+        use_selection=True,
+        use_materials=True
+    )
+    '''
+                elif ext == ".sbsar":
+                    messagebox.showerror("Error", "Exporting to .sbsar format is not supported.")
+                    return
+                else:
+                    messagebox.showerror("Error", f"Unsupported file extension: {ext}")
+                    return
+
+                with open(script_path, 'w', encoding='utf-8') as script_file:
+                    script_file.write(script_content)
+
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
+                subprocess.run([
+                    blender_exe_path,
+                    '--background',
+                    '--factory-startup',
+                    '--python', script_path
+                ], check=True, startupinfo=startupinfo)
+
+            messagebox.showinfo("Success", f"Material '{selected_material}' exported successfully to '{export_path}'.")
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Error", f"Failed to export material: {e}")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
+
     def export_selected_mesh(self, meshes_listbox, project_path):
         import tempfile
         import subprocess
@@ -7682,74 +7792,6 @@ else:
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
 
-    def export_selected_material(self, materials_listbox, project_path):
-        import tempfile
-        import subprocess
-        import os
-        from tkinter import messagebox, filedialog
-
-        selected_indices = materials_listbox.curselection()
-        if not selected_indices:
-            messagebox.showwarning("Warning", "No material selected.")
-            return
-        selected_material = materials_listbox.get(selected_indices[0])
-
-        export_path = filedialog.asksaveasfilename(
-            defaultextension=".blend",
-            filetypes=[("Blender File", "*.blend"), ("All Files", "*.*")],
-            title="Save Material As"
-        )
-        if not export_path:
-            return
-
-        try:
-            blender_exe_path = self.get_blender_executable_path()
-            if not blender_exe_path:
-                messagebox.showerror("Error", "Blender executable path not found.")
-                return
-
-            with tempfile.TemporaryDirectory() as temp_dir:
-                script_path = os.path.join(temp_dir, 'export_material.py')
-
-                script_content = f'''
-import bpy
-
-blend_file_path = r"{project_path}"
-material_name = r"{selected_material}"
-export_path = r"{export_path}"
-
-bpy.ops.wm.read_factory_settings(use_empty=True)
-
-with bpy.data.libraries.load(blend_file_path, link=False) as (data_from, data_to):
-    if material_name in data_from.materials:
-        data_to.materials = [material_name]
-    else:
-        print(f"Material {{material_name}} not found in the blend file.")
-        exit()
-
-bpy.ops.wm.save_as_mainfile(filepath=export_path)
-    '''
-
-                with open(script_path, 'w', encoding='utf-8') as script_file:
-                    script_file.write(script_content)
-
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-
-                subprocess.run([
-                    blender_exe_path,
-                    '--background',
-                    '--factory-startup',
-                    '--python', script_path
-                ], check=True, startupinfo=startupinfo)
-
-            messagebox.showinfo("Success", f"Material '{selected_material}' exported successfully to '{export_path}'.")
-        except subprocess.CalledProcessError as e:
-            messagebox.showerror("Error", f"Failed to export material: {e}")
-        except Exception as e:
-            messagebox.showerror("Error", f"An error occurred: {e}")
-
     def export_selected_texture(self, textures_listbox):
         import shutil
         import os
@@ -7775,6 +7817,7 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
             messagebox.showinfo("Success", f"Texture copied to '{destination}'.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to copy texture: {e}")
+
 
 
 
@@ -7888,10 +7931,10 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
     
     def create_install_view(self):
         self.install_frame = ttkb.Frame(self.versions_parent_frame, padding=(0, 0, 0, 0))
-        
+    
         left_frame = ttkb.Frame(self.install_frame)
         left_frame.pack(side='left', fill='y', padx=(0, 10), pady=(0, 10))
-        
+    
         right_frame = ttkb.Frame(self.install_frame)
         right_frame.pack(side='right', expand=1, fill='both')
         button_font_family = self.button_font_family
@@ -7900,14 +7943,14 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
         font_size = self.treeview_font_size
         os_frame = ttkb.Frame(left_frame)
         os_frame.pack(fill='x', pady=(0, 10))
-        
+    
         self.os_label = ttkb.Label(
             os_frame,
             text="Select Operating System:",
             font=(button_font_family, 10, 'bold')
         )
         self.os_label.pack(side='top', padx=(10, 10))
-        
+    
         self.os_combobox = ttkb.Combobox(
             os_frame,
             values=["Windows", "macOS", "Linux"],
@@ -7918,7 +7961,7 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
         self.os_combobox.set("Select OS")
         self.os_combobox.pack(fill='x', padx=(10, 10))
         self.os_combobox.bind("<<ComboboxSelected>>", self.on_os_selected)
-        
+    
         self.win_arch_combobox = ttkb.Combobox(
             os_frame,
             values=["32-bit", "64-bit"],
@@ -7927,9 +7970,9 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
             bootstyle="primary"
         )
         self.win_arch_combobox.set("Select Architecture")
-        self.win_arch_combobox.pack(fill='x',padx=(10, 10))
+        self.win_arch_combobox.pack(fill='x', padx=(10, 10))
         self.win_arch_combobox.pack_forget()  
-        
+    
         self.arch_combobox = ttkb.Combobox(
             os_frame,
             values=["Intel", "Apple Silicon"],
@@ -7940,10 +7983,10 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
         self.arch_combobox.set("Select Architecture")
         self.arch_combobox.pack(fill='x', padx=(10, 10))
         self.arch_combobox.pack_forget()  
-        
+    
         buttons_frame = ttkb.Frame(left_frame)
         buttons_frame.pack(fill='x', pady=(0, 10))
-        
+    
         self.get_stable_btn = ttkb.Button(
             buttons_frame,
             text="Get Stable Versions",
@@ -7952,7 +7995,7 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
             bootstyle="primary"
         )
         self.get_stable_btn.pack(fill='x', pady=(5, 5), padx=(10, 10))
-        
+    
         self.get_unstable_btn = ttkb.Button(
             buttons_frame,
             text="Get Unstable Versions",
@@ -7961,7 +8004,7 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
             bootstyle="primary"
         )
         self.get_unstable_btn.pack(fill='x', pady=(5, 5), padx=(10, 10))
-        
+    
         self.install_btn = ttkb.Button(
             left_frame,
             text="Install",
@@ -7970,8 +8013,7 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
             bootstyle="primary"
         )
         self.install_btn.pack(fill='x', pady=(5, 10), padx=(10, 10))
-        
-        # Install Progress Frame
+    
         self.install_progress_frame = ttkb.Frame(left_frame)
         self.install_progress_label = ttkb.Label(
             self.install_progress_frame,
@@ -7979,7 +8021,7 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
             font=('Helvetica', 10)
         )
         self.install_progress_label.pack(side='top', padx=(10, 10))
-        
+    
         self.install_progress_var = tk.DoubleVar()
         self.install_progress_bar = ttkb.Progressbar(
             self.install_progress_frame,
@@ -7988,10 +8030,10 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
             bootstyle="primary-striped"
         )
         self.install_progress_bar.pack(fill='x', expand=1)
-        
+    
         self.install_progress_frame.pack(fill='x', pady=(5, 10), padx=(10, 10))
         self.install_progress_frame.pack_forget()
-        
+    
         self.cancel_button = ttkb.Button(
             left_frame,
             text="Cancel",
@@ -8001,7 +8043,7 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
         )
         self.cancel_button.pack(fill='x', pady=(5, 10), padx=(10, 10))
         self.cancel_button.pack_forget()
-        
+    
         self.release_notes_btn = ttkb.Button(
             left_frame,
             text="Release Notes",
@@ -8014,7 +8056,7 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
         style = ttkb.Style()
         style.configure("InstallVersions.Treeview", font=(font_family, 12), rowheight=30)  
         style.configure("InstallVersions.Treeview.Heading", font=('Segoe UI', 14, 'bold'))  
-        
+    
         self.tree = ttkb.Treeview(right_frame, columns=("Version", "Release Date"), show="headings", height=20, style="InstallVersions.Treeview")
         self.tree.heading("Version", text="Blender Version", command=lambda: self.sort_treeview_column_installation_tab("Version"))
         self.tree.heading("Release Date", text="Release Date", command=lambda: self.sort_treeview_column_installation_tab("Release Date"))
@@ -8023,6 +8065,28 @@ bpy.ops.wm.save_as_mainfile(filepath=export_path)
         self.tree.pack(expand=1, fill='both', padx=0, pady=0)
         self.tree.bind("<<TreeviewSelect>>", self.on_treeview_select_install_tab)
         self.download_links = {}
+    
+        # Auto-detect OS and Architecture
+        current_os = platform.system()
+        if current_os == "Windows":
+            self.os_combobox.set("Windows")
+            arch = platform.architecture()[0]
+            if arch == "64bit":
+                self.win_arch_combobox.set("64-bit")
+            elif arch == "32bit":
+                self.win_arch_combobox.set("32-bit")
+            self.on_os_selected(None)
+        elif current_os == "Darwin":
+            self.os_combobox.set("macOS")
+            machine = platform.machine().lower()
+            if "arm" in machine or "aarch64" in machine:
+                self.arch_combobox.set("Apple Silicon")
+            else:
+                self.arch_combobox.set("Intel")
+            self.on_os_selected(None)
+        elif current_os == "Linux":
+            self.os_combobox.set("Linux")
+            self.on_os_selected(None)
     
     def create_installed_view(self):
         self.installed_frame = ttkb.Frame(self.versions_parent_frame, padding=(0, 0, 0, 0))
