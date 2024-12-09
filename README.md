@@ -3,9 +3,9 @@
 ![bmanager1](https://github.com/user-attachments/assets/8f9f6104-29c1-405b-b0f4-9516470f7231)
 
 
-# Welcome to Blender Manager 🎉
+# Welcome to Blender Manager 
 
-Hey there, Blender enthusiast! Ready to level up your workflow? Welcome to **Blender Manager**, your new best friend for handling all things Blender. From juggling multiple versions to keeping your projects and addons in check, this tool’s got your back. Let’s get started. 🚀
+Hey there, Blender enthusiast! Ready to level up your workflow? Welcome to **Blender Manager**, your new best friend for handling all things Blender. From juggling multiple versions to keeping your projects and addons in check, this tool’s got your back. Let’s get started. 
 
 ---
 
@@ -33,10 +33,6 @@ Here’s a taste of what it does:
 - **Project Management**: Keep all your blend files tidy and easy to access.  
 - **Addon Management**: Activate, deactivate, or move addons between versions. Simple as that.  
 - **Render Management**: Preview, organize, and add notes to your renders.  
-
-And yes, it looks slick while doing it. 🕶️  
-
-
 
 
 <details>
