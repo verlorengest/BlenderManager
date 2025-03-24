@@ -3,37 +3,12 @@
 ![bmanager1](https://github.com/user-attachments/assets/8f9f6104-29c1-405b-b0f4-9516470f7231)
 
 
-# Welcome to Blender Manager 
+# Purpose
 
-Hey there, Blender enthusiast! Ready to level up your workflow? Welcome to **Blender Manager**, your new best friend for handling all things Blender. From juggling multiple versions to keeping your projects and addons in check, this tool’s got your back. Let’s get started. 
+Blender Manager is an open-source tool for keep your Blender updated, organized and clean.
 
----
-
-## What’s Blender Manager?
-
-It’s like a command center for your Blender setup. Want to:
-
-- Keep your Blender updated? ✅ 
-- Switch between Blender versions like a pro? ✅
-- Efortlessly create projects? ✅
-- Organize your messy projects into a neat library? ✅  
-- Manage addons without diving into Blender every time? Oh, you bet. ✅  
-
-Yeah, Blender Manager does all that and more.
 
 ---
-
-## Why You’ll Love It 💖
-
-Here’s the deal: Blender Manager takes the boring, repetitive tasks and makes them *easy*. No more hunting for the right Blender version or manually transferring addons. Just click a few buttons, and boom, you’re good to go.
-
-Here’s a taste of what it does:  
-
-- **Version Management**: Install, update, and switch Blender versions with zero hassle.  
-- **Project Management**: Keep all your blend files tidy and easy to access.  
-- **Addon Management**: Activate, deactivate, or move addons between versions. Simple as that.  
-- **Render Management**: Preview, organize, and add notes to your renders.  
-
 
 <details>
 <summary>📋 <strong>Screenshots</strong></summary>
@@ -67,256 +42,60 @@ Selected Font: SimHei
 </details>
 
 <details>
-<summary>📋 <strong>Features</strong></summary>
+<summary>📋 <strong>Core Features</strong></summary>
 
-# Blender Manager Documentation
 
-## 1) Main Menu
+## **1) Main Menu**
 
-The Main Menu serves as the central hub of Blender Manager, offering various settings and quick access options to enhance your workflow.
-
-### Features
-
-#### Launch Blender
-
-Provides quick access to the Blender version you have set as the main version in the Version Management section. Left-clicking presents three options:
-
-- **Launch With Argument**: Start Blender with custom command-line arguments to enable different functionalities upon launch.
-
-- **Export Blender**: Export your Blender installation to a specified file location.
-
-- **Delete Blender**: Remove the Blender application from your system.
-
-#### Create Project
-
-Facilitates practical adjustments for your new Blender projects before you start them. It consists of three sections:
-
-- **Reference Images**: Set up reference images for your project in an organized manner, covering front, back, right, left, top, and bottom views.
-
-- **Base Mesh**: Start your project with a pre-prepared mesh. Upload your mesh file from your computer.
-
-- **Settings**:
-
-  - **Elements**: Include or remove default elements such as the camera and lighting when starting a new project, according to your preferences.
-
-  - **Autosave**: Automatically back up the current state of your project at desired intervals. Specify where to save project backups and choose to save each backup as a separate file or overwrite the previous one.
-
-#### Check Updates
-
-Verify whether the latest version of Blender is installed. If not, you can opt to automatically install the latest version.
-
-#### Settings
-
-##### Preferences
-
-Personalize the Blender Manager application:
-
-- Change the theme.
-- Adjust the size of main headings, texts, and buttons.
-- Change fonts.
-- Adjust the transparency of the application interface.
-
-##### General Settings
-
-- **Setup Addon**: Install the Blender Manager addon to all your Blender versions.
-
-- **Change Launch Folder**: Change the default folder from which Blender is launched.
-
-- **Auto Update Blender**: Automatically update your Blender application when a new version is released.
-
-- **BM Auto Update**: Automatically update Blender Manager itself when a new version is available.
-
-- **Auto Activate Addon After Adding**: Automatically activate the Blender Manager addon when you install a new Blender version.
-
-- **Launch on Startup**: Set Blender Manager to open automatically when your computer starts.
-
-- **Run in Background**: Allow Blender Manager to run in the background.
-
-- **Download Chunk Size Multiplier**: Adjust the download speed for installations within Blender Manager based on your internet connection speed.
-
-- **Tab Visibility Settings**: Hide main tabs that you do not use for a cleaner workspace.
-
-- **Reset Data**: Reset all data provided by Blender Manager, including preferences, installed versions, and settings.
-
-  **Warning**: This action is irreversible.
-
-- **Delete All Versions**: Delete all Blender versions installed through Blender Manager.
-
-  **Warning**: This action is irreversible.
-
-- **Reset Settings**: Reset Blender Manager settings to their default values.
-
-- **Reset Blender Configurations**: Reset all settings of the selected Blender version to defaults.
-
-- **Restart**: Restart Blender Manager to apply and save any changes made in the settings.
-
-##### Blender Settings
-
-- **Transfer Settings**: Transfer settings from one Blender version to another by selecting the source and target versions.
-
-- **Export/Import Settings**: Export or import settings of a selected Blender version.
-
-#### Recent Projects
-
-View your most recent Blender projects and the last date each project was opened.
-
-- **Single Click**: Display the total time spent on the project.
-
-- **Double Click**: Quickly open the project with your main Blender version.
-
-- **Right Click**: Delete the project.
-
-#### Help Section
-
-Contains:
-
-- **Documentation**: Access to the Blender Manager user guide.
-
-- **Credits**: Information about contributors.
-
-- **Donations**: Options to support the project.
-
-#### Version Information
-
-Located in the lower-left corner, displaying the versions of Blender and Blender Manager you have installed. If not up to date, the version number becomes clickable for automatic updates.
+- **Launch Blender**: Start your main Blender version, export it, or delete it with a click.  
+- **Create Project**: Create a new project with reference images, a base mesh, and custom startup settings.  
+- **Check Updates**: Check for the latest Blender version and update if needed.  
+- **Preferences**: Customize the Blender Manager interface theme, fonts, sizes, and transparency.  
+- **General Settings**: Configure general options like addon setup, auto-updates, launch behavior, and data reset.  
+- **Blender Settings**: Export, import, or transfer settings between Blender versions.  
+- **Recent Projects**: View, open, or delete recently accessed projects and check time spent.  
+- **Help Section**: Access documentation, contributor credits, and donation options.  
+- **Version Info**: View installed versions and update if an outdated version is detected.
 
 ---
 
-## 2) Addon Management
+## **2) Addon Management**
 
-Manage all your Blender addons in one place, configuring them as desired across different Blender versions.
-
-### Features
-
-- **Add Addon**: Import an addon from your computer into Blender Manager using the **Browse** button.
-
-- **Refresh**: Update the addon list after adding new addons or making changes.
-
-- **Version Selection**: Select a Blender version to view and manage addons registered for that version.
-
-- **Addon List**: Right-click on any addon to access management options.
-
-#### Right-click Options
-
-- **Delete**: Remove the addon from the selected Blender version.
-
-- **Go to File Path**: Open the file location of the addon on your computer.
-
-- **Info**: View details about the addon, such as version, author, and description.
-
-- **View Documentation**: Access the addon's documentation for usage instructions.
-
-- **Duplicate to**: Copy the addon to another Blender version.
-
-- **Activate Addon**: Activate the addon without opening Blender.
-
-- **Deactivate Addon**: Deactivate the addon without opening Blender.
-
-View addon versions, compatible Blender versions, and activation status.
+- **Add Addon**: Import Blender addons from your computer.  
+- **Refresh**: Update the addon list after changes.  
+- **Version Selection**: Choose a Blender version to view its addons.  
+- **Addon List & Right-Click**: Manage addons by deleting, duplicating, activating, deactivating, or viewing info and documentation.
 
 ---
 
-## 3) Project Management
+## **3) Project Management**
 
-Organize and manage your Blender projects efficiently.
-
-### Features
-
-- **Add Project**: Import existing projects into Blender Manager using the **Browse** button.
-
-- **Refresh**: Update the project list after adding new projects or making changes.
-
-- **Project List**:
-
-  - **Hierarchy Management**: Click on **Project Name** to adjust the hierarchy.
-
-  - **Drag and Drop**: Import folders containing blend files by dragging them into the area.
-
-- **Project Information**: View file size, Blender version used, and last modification date.
-
-- **Right-click Options**
-
-  - **Open With**: Open the project with any installed Blender version.
-
-  - **Rename**: Change the project's name.
-
-  - **Go to File Path**: Open the project's file location.
-
-  - **Delete**: Remove the project from Blender Manager.
-
-    **Note**: This deletes the project file from your system.
-
-  - **Export**: Export the project in formats like FBX, glTF, or ABC. Select the format in the dialog that appears.
-
-  - **Info**: View detailed information and preview images. Export individual meshes independently.
-
-  - **Move to Folder**: Move the project to a different folder within Blender Manager.
+- **Add Project**: Import existing Blender projects into the manager.  
+- **Refresh**: Refresh the project list to reflect recent changes.  
+- **Project List**: Organize, drag and drop, and manage your project hierarchy.  
+- **Project Info & Right-Click**: Rename, open, move, delete, export, or view project details and previews.
 
 ---
 
-## 4) Version Management
+## **4) Version Management**
 
-Simplify downloading, accessing, and managing different Blender versions.
-
-### Features
-
-- **OS and Architecture Selection**: Choose your operating system and architecture for compatibility.
-
-- **Get Versions**:
-
-  - **Get Stable Versions**: Display official stable Blender releases.
-
-  - **Get Unstable Versions**: Display experimental or beta Blender releases.
-
-- **Version List**: View available Blender versions with release dates.
-
-- **Install**:
-
-  - Select a version and click **Install** to download and install it.
-
-- **Release Notes**: Access official notes detailing new features and changes.
-
-- **Installed Versions**:
-
-  - **Refresh**: Update the list to include newly installed versions.
-
-  - **Right-click Options**:
-
-    - **Create Shortcut**: Generate a desktop shortcut.
-
-    - **Delete**: Remove the Blender version from your system.
-
-- **Buttons**:
-
-  - **Launch**: Open the selected version.
-
-    - **Factory Settings**: Open with default Blender settings.
-
-  - **Convert to Main**: Set the selected version as your main Blender version.
-
-  - **Install a Version**: Return to download and install new versions.
+- **OS & Architecture**: Select your operating system and architecture for compatibility.  
+- **Get Versions**: List official stable or experimental Blender releases.  
+- **Install**: Download and install selected Blender versions.  
+- **Release Notes**: Read about new features and updates in each release.  
+- **Installed Versions**: View, refresh, create shortcuts, or delete installed Blender versions.  
+- **Buttons**: Launch, open with factory settings, or set as the main version.
 
 ---
 
-## 5) Render Management
+## **5) Render Management**
 
-View and manage textures and renders you've created and saved in Blender.
-
-### Features
-
-- **Render List**: Displays renders with file size, resolution, and last modification date. Preview renders by selecting them.
-
-- **Browse**: Import renders from your computer.
-
-- **Open**: Open selected renders.
-
-- **Refresh**: Update the list after adding new renders.
-
-- **Delete**: Remove renders from Blender Manager.
-
-  **Note**: This deletes the render file from your system.
-
-- **Render Notes**: Add notes or comments about the render for future reference.
+- **Render List**: Display renders with file size, resolution, and modification date.  
+- **Browse**: Import render files from your computer.  
+- **Open**: Preview selected renders.  
+- **Refresh**: Update the render list after changes.  
+- **Delete**: Permanently delete selected render files from your system.  
+- **Render Notes**: Add personal notes or comments to your renders.
 
 </details>
 
