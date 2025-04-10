@@ -218,7 +218,7 @@ This version may contain bugs and issues as it is still in pre-release. Your fee
 
 Blender Manager is free and open-source. If you find it helpful, consider supporting the project:
 
-- [**Gumroad**](https://verloren.gumroad.com/l/blendermanager)  
+- [**Gumroad**](https://kaansoyler.gumroad.com/l/blendermanager)  
 - [**Buy Me a Coffee**](https://buymeacoffee.com/verlorengest) ☕
 
 
