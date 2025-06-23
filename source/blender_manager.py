@@ -105,7 +105,7 @@ def enable_dark_mode(hwnd):
 
 CONFIG_FILE_PATH = os.path.join(os.path.expanduser("~"), ".BlenderManager", "config.json")
 DEFAULT_SETTINGS = {
-    "version": "1.0.1",
+    "version": "1.0.2",
     "selected_theme": "darkly",
     "auto_update_checkbox": True,
     "bm_auto_update_checkbox": False,
@@ -211,7 +211,10 @@ class BlenderManagerApp(TkinterDnD.Tk):
         self.load_settings_on_begining()
         self.iconbitmap(r"Assets/Images/bmng.ico")
         self.attributes('-fullscreen', False) 
-        hwnd = ctypes.windll.user32.FindWindowW(None, "Blender Manager")
+        if platform.system() == "Windows":
+            hwnd = ctypes.windll.user32.FindWindowW(None, "Blender Manager")
+        else:
+            hwnd=None
         if os.name == 'nt':
             enable_dark_mode(hwnd)
         self.schedule_tray_icon_creation()
@@ -296,7 +299,12 @@ class BlenderManagerApp(TkinterDnD.Tk):
 
         
 
-
+    def bind_right_click(self, widget, callback):
+        """Bind right-click events for cross-platform compatibility."""
+        widget.bind("<Button-3>", callback)  # Windows/Linux
+        if platform.system() == "Darwin":  # macOS
+            widget.bind("<Button-2>", callback)  # Middle click on macOS
+            widget.bind("<Control-Button-1>", callback)  # Ctrl+Click on macOS
 
 
         
@@ -1564,7 +1572,7 @@ class BlenderManagerApp(TkinterDnD.Tk):
             width=15
         )
         self.launch_button.grid(row=1, column=0, pady=(30, 5), sticky="ew", ipady=5)  
-        self.launch_button.bind("<Button-3>", self.launch_right_click_menu)
+        self.bind_right_click(self.launch_button, self.launch_right_click_menu)
 
 
 
@@ -1708,7 +1716,8 @@ class BlenderManagerApp(TkinterDnD.Tk):
         projects_frame.grid_columnconfigure(0, weight=1)
         projects_frame.grid_rowconfigure(0, weight=1)
 
-        self.recent_projects_tree.bind("<Button-3>", self.show_context_menu)
+        self.bind_right_click(self.recent_projects_tree, self.show_context_menu)
+
 
         recent_projects = self.load_recent_projects()
         for project in recent_projects:
@@ -2589,7 +2598,6 @@ Additional Features:
 
 
 
-
     def launch_right_click_menu(self, event):
         """Display a context menu for the Launch button if it is active."""
 
@@ -3183,7 +3191,8 @@ Additional Features:
 
     def enable_buttons(self):
         self.launch_button.config(state='normal', text="Launch Blender")
-        self.launch_button.bind("<Button-3>", self.on_right_click)
+        self.bind_right_click(self.launch_button, self.on_right_click)
+
         self.create_project_button.config(state='normal')
         self.update_button.config(state='normal')
 
@@ -5439,7 +5448,8 @@ print("Addon '{addon_name}' activated successfully.")
         self.plugin_context_menu.add_command(label="Activate Addon", command=self.activate_selected_addon_in_versions)
         self.plugin_context_menu.add_command(label="Deactivate Addon", command=self.deactivate_selected_addon_in_versions)
 
-        self.plugins_tree.bind("<Button-3>", self.show_plugin_context_menu)
+        self.bind_right_click(self.plugins_tree, self.show_plugin_context_menu)
+
 
         self.refresh_plugins_list()
 
@@ -6482,7 +6492,8 @@ except Exception as e:
         self.move_menu = tk.Menu(self.context_menu, tearoff=0)
         self.context_menu.add_cascade(label="Move to Folder", menu=self.move_menu)
 
-        self.projects_tree.bind("<Button-3>", self.show_context_menu_projects)
+        self.bind_right_click(self.projects_tree, self.show_context_menu_projects)
+
         self.refresh_projects_list()
 
 
@@ -8155,7 +8166,8 @@ else:
         self.versions_context_menu = tk.Menu(self.installed_versions_tree, tearoff=0)
         self.versions_context_menu.add_command(label="Create Shortcut", command=self.create_shortcut)
         self.versions_context_menu.add_command(label="Delete", command=self.remove_installed_version)
-        self.installed_versions_tree.bind("<Button-3>", self.show_installed_context_menu)
+        self.bind_right_click(self.installed_versions_tree, self.show_installed_context_menu)
+
 
         self.refresh_installed_versions()
 
