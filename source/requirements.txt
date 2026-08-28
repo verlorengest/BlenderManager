@@ -1,4 +1,4 @@
-ttkbootstrap
+ttkbootstrap<2,>=1.10
 tkinterdnd2
 pystray
 Pillow
@@ -6,4 +6,8 @@ beautifulsoup4
 pywebview
 psutil
 pywin32
+winshell
 requests
+aiohttp
+certifi
+packaging
